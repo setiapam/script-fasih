@@ -1,0 +1,9 @@
+# Python Cache Files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Editor configs / Local managers
+.mise/
+.python-version

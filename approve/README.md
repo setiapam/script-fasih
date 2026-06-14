@@ -15,8 +15,8 @@ Script ini digunakan untuk mengotomatiskan persetujuan (approval) penugasan (*as
 
 ## Persyaratan (Prerequisites)
 
-* **Python 3.x** terinstal pada sistem Anda (dapat dikelola menggunakan [mise](mise.toml) dengan versi Python yang sesuai).
-* Library eksternal yang dibutuhkan dapat diinstal menggunakan terminal dengan perintah:
+* **Python 3.x** terinstal pada sistem Anda (dapat dikelola menggunakan [mise](../mise.toml) di root proyek dengan versi Python yang sesuai).
+* Library eksternal yang dibutuhkan dapat diinstal menggunakan terminal dengan perintah (dijalankan dari root proyek):
   ```bash
   pip install -r requirements.txt
   ```
@@ -26,10 +26,10 @@ Script ini digunakan untuk mengotomatiskan persetujuan (approval) penugasan (*as
 ## File yang Terlibat
 
 * **[hit_endpoint.py](hit_endpoint.py)**: Kode utama script otomatisasi Python.
-* **[requirements.txt](requirements.txt)**: Berkas konfigurasi library dependensi (Python requests).
+* **[requirements.txt](../requirements.txt)**: Berkas konfigurasi library dependensi terpusat di root proyek.
 * **[curl.txt](curl.txt)**: Tempat menempelkan salinan perintah cURL dari browser Anda (berfungsi sebagai sumber autentikasi sesi).
 * **[ids.json](ids.json)**: Berkas JSON berisi daftar objek dengan key `"id"` yang merupakan ID penugasan yang ingin disetujui secara massal.
-* **[mise.toml](mise.toml)**: Konfigurasi runtime tool manager `mise` untuk mengunci versi Python yang digunakan.
+* **[mise.toml](../mise.toml)**: Konfigurasi runtime tool manager `mise` terpusat di root proyek.
 
 ---
 

@@ -17,8 +17,8 @@ Script ini digunakan untuk mengotomatiskan pencarian dan penghapusan alokasi pen
 
 ## Persyaratan (Prerequisites)
 
-* **Python 3.x** terinstal pada sistem Anda (bisa dikelola dengan runtime manager `mise`).
-* Library eksternal yang terdaftar pada `requirements.txt`. Instal menggunakan terminal:
+* **Python 3.x** terinstal pada sistem Anda (bisa dikelola dengan runtime manager [mise](../mise.toml) terpusat di root proyek).
+* Library eksternal yang terdaftar pada `requirements.txt` terpusat. Instal menggunakan terminal (dijalankan dari root proyek):
   ```bash
   pip install -r requirements.txt
   ```
@@ -28,12 +28,12 @@ Script ini digunakan untuk mengotomatiskan pencarian dan penghapusan alokasi pen
 ## File yang Terlibat
 
 * **[hit_endpoint.py](hit_endpoint.py)**: File utama script Python.
-* **[requirements.txt](requirements.txt)**: Berkas konfigurasi library dependensi (Python requests).
+* **[requirements.txt](../requirements.txt)**: Berkas konfigurasi library dependensi terpusat di root proyek.
 * **[curl.txt](curl.txt)**: File teks untuk menempelkan perintah cURL dari browser Anda (digunakan sebagai sumber autentikasi).
 * **[petugas.txt](petugas.txt)**: File teks berisi daftar email petugas (satu email per baris).
 * **[pengawas.txt](pengawas.txt)**: File teks berisi daftar email pengawas (satu email per baris).
 * **[ids.json](ids.json)**: File database sementara tempat script menyimpan hasil pencarian target sebelum dihapus.
-* **[mise.toml](mise.toml)**: Konfigurasi penentu versi Python jika menggunakan runtime manager `mise`.
+* **[mise.toml](../mise.toml)**: Konfigurasi penentu versi Python jika menggunakan runtime manager `mise` terpusat di root proyek.
 
 ---
 
