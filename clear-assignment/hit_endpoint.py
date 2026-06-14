@@ -300,15 +300,29 @@ def main():
         print("[*] Dibatalkan oleh pengguna.")
         return
 
+    import datetime
+    timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_file = "execution.log"
+    
+    with open(log_file, "a", encoding="utf-8") as lf:
+        lf.write(f"\n==================================================\n")
+        lf.write(f"EKSEKUSI CLEAR ASSIGNMENT: {timestamp_str}\n")
+        lf.write(f"==================================================\n")
+        
     # Kirim request ke clear endpoint dalam batch
     batch_size = 100
     total_cleared = 0
     total_failed = 0
+    failed_details = []
+    
     print(f"\n[*] Memulai pengiriman batch (batch size: {batch_size})...")
     
     for i in range(0, len(all_ids), batch_size):
         batch = all_ids[i:i+batch_size]
-        print(f"[{i//batch_size + 1}/{(len(all_ids)-1)//batch_size + 1}] Mengirim {len(batch)} ID...")
+        log_msg = f"[{i//batch_size + 1}/{(len(all_ids)-1)//batch_size + 1}] Mengirim {len(batch)} ID..."
+        print(log_msg)
+        with open(log_file, "a", encoding="utf-8") as lf:
+            lf.write(log_msg + "\n")
         
         try:
             response = requests.post(
@@ -318,29 +332,59 @@ def main():
             )
             
             if response.status_code in (200, 201):
-                print(f" -> [SUKSES] Status HTTP: {response.status_code}")
+                msg = f" -> [SUKSES] Status HTTP: {response.status_code}"
+                print(msg)
                 total_cleared += len(batch)
             else:
-                print(f" -> [GAGAL] Status HTTP: {response.status_code}")
+                msg = f" -> [GAGAL] Status HTTP: {response.status_code}"
+                print(msg)
                 total_failed += len(batch)
+                for item_id in batch:
+                    failed_details.append({"id": item_id, "reason": f"Batch HTTP {response.status_code}"})
+                
+            with open(log_file, "a", encoding="utf-8") as lf:
+                lf.write(msg + "\n")
                 
             try:
                 res_json = response.json()
-                print(f" -> Response: {res_json}")
+                resp_msg = f" -> Response: {res_json}"
+                print(resp_msg)
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    lf.write(resp_msg + "\n")
             except Exception:
-                print(f" -> Response Text: {response.text[:200]}")
+                resp_msg = f" -> Response Text: {response.text[:200]}"
+                print(resp_msg)
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    lf.write(resp_msg + "\n")
                 
         except Exception as e:
-            print(f" -> [ERROR] Terjadi error saat mengirim batch: {e}")
+            msg = f" -> [ERROR] Terjadi error saat mengirim batch: {e}"
+            print(msg)
+            with open(log_file, "a", encoding="utf-8") as lf:
+                lf.write(msg + "\n")
             total_failed += len(batch)
+            for item_id in batch:
+                failed_details.append({"id": item_id, "reason": f"Exception: {e}"})
             
-    print("\n" + "=" * 50)
-    print("           RINGKASAN AKHIR PENGEKSEKUSIAN")
-    print("=" * 50)
-    print(f" - Berhasil diproses : {total_cleared}")
-    print(f" - Gagal diproses    : {total_failed}")
-    print(f" - Total target      : {len(all_ids)}")
-    print("=" * 50)
+    summary_lines = []
+    summary_lines.append("\n" + "=" * 50)
+    summary_lines.append("           RINGKASAN AKHIR PENGEKSEKUSIAN")
+    summary_lines.append("=" * 50)
+    summary_lines.append(f" - Berhasil diproses : {total_cleared}")
+    summary_lines.append(f" - Gagal diproses    : {total_failed}")
+    summary_lines.append(f" - Total target      : {len(all_ids)}")
+    summary_lines.append("=" * 50)
+    
+    if failed_details:
+        summary_lines.append("DETAIL KEGAGALAN:")
+        for fd in failed_details:
+            summary_lines.append(f" - ID: {fd['id']} (Alasan: {fd['reason']})")
+        summary_lines.append("=" * 50)
+        
+    summary_text = "\n".join(summary_lines)
+    print(summary_text)
+    with open(log_file, "a", encoding="utf-8") as lf:
+        lf.write(summary_text + "\n")
 
 if __name__ == "__main__":
     main()

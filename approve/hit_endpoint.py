@@ -55,11 +55,21 @@ def main():
     # Endpoint approval yang benar
     url_base = "https://fasih-sm.bps.go.id/assignment-approval/api/v2/approval"
     
+    import datetime
+    timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_file = "execution.log"
+    
+    with open(log_file, "a", encoding="utf-8") as lf:
+        lf.write(f"\n==================================================\n")
+        lf.write(f"EKSEKUSI APPROVE: {timestamp_str}\n")
+        lf.write(f"==================================================\n")
+        
     print(f"[*] Memulai proses approval untuk {len(ids)} ID...\n")
     print("-" * 40)
     
     total_success = 0
     total_failed = 0
+    failed_details = []
     
     for idx, item in enumerate(ids):
         assignment_id = item.get("id")
@@ -67,7 +77,10 @@ def main():
         if not assignment_id:
             continue
             
-        print(f"[{idx+1}/{len(ids)}] Memproses ID: {assignment_id}")
+        log_msg = f"[{idx+1}/{len(ids)}] Memproses ID: {assignment_id}"
+        print(log_msg)
+        with open(log_file, "a", encoding="utf-8") as lf:
+            lf.write(log_msg + "\n")
         
         # --- PERAKITAN PAYLOAD MULTIPART/FORM-DATA ---
         # Berdasarkan cURL Anda, ada 3 field yang harus dikirim
@@ -83,33 +96,60 @@ def main():
             response = requests.post(url_base, headers=headers, files=multipart_data)
             
             if response.status_code in (200, 201):
-                print(f" -> [SUKSES] Status HTTP: {response.status_code}")
+                msg = f" -> [SUKSES] Status HTTP: {response.status_code}"
+                print(msg)
                 total_success += 1
             else:
-                print(f" -> [GAGAL] Status HTTP: {response.status_code}")
+                msg = f" -> [GAGAL] Status HTTP: {response.status_code}"
+                print(msg)
                 total_failed += 1
+                failed_details.append({"id": assignment_id, "reason": f"Status HTTP {response.status_code}"})
+                
+            with open(log_file, "a", encoding="utf-8") as lf:
+                lf.write(msg + "\n")
             
             try:
                 parsed_response = response.json()
-                # Hanya menampilkan sebagian isi response agar rapi
-                print(f" -> Response Status: {parsed_response.get('message')} | Data: {parsed_response.get('data')}")
+                resp_msg = f" -> Response Status: {parsed_response.get('message')} | Data: {parsed_response.get('data')}"
+                print(resp_msg)
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    lf.write(resp_msg + "\n")
             except json.JSONDecodeError:
-                print(f" -> Response: {response.text}")
+                resp_msg = f" -> Response: {response.text}"
+                print(resp_msg)
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    lf.write(resp_msg + "\n")
                 
             print("-" * 40)
             
         except requests.exceptions.RequestException as e:
-            print(f" -> [ERROR] Request gagal: {e}")
+            msg = f" -> [ERROR] Request gagal: {e}"
+            print(msg)
+            with open(log_file, "a", encoding="utf-8") as lf:
+                lf.write(msg + "\n")
             total_failed += 1
+            failed_details.append({"id": assignment_id, "reason": f"RequestException: {e}"})
             print("-" * 40)
 
-    print("\n" + "=" * 50)
-    print("           RINGKASAN AKHIR PENGEKSEKUSIAN")
-    print("=" * 50)
-    print(f" - Berhasil diproses : {total_success}")
-    print(f" - Gagal diproses    : {total_failed}")
-    print(f" - Total target      : {len(ids)}")
-    print("=" * 50)
+    summary_lines = []
+    summary_lines.append("\n" + "=" * 50)
+    summary_lines.append("           RINGKASAN AKHIR PENGEKSEKUSIAN")
+    summary_lines.append("=" * 50)
+    summary_lines.append(f" - Berhasil diproses : {total_success}")
+    summary_lines.append(f" - Gagal diproses    : {total_failed}")
+    summary_lines.append(f" - Total target      : {len(ids)}")
+    summary_lines.append("=" * 50)
+    
+    if failed_details:
+        summary_lines.append("DETAIL KEGAGALAN:")
+        for fd in failed_details:
+            summary_lines.append(f" - ID: {fd['id']} (Alasan: {fd['reason']})")
+        summary_lines.append("=" * 50)
+        
+    summary_text = "\n".join(summary_lines)
+    print(summary_text)
+    with open(log_file, "a", encoding="utf-8") as lf:
+        lf.write(summary_text + "\n")
 
 if __name__ == "__main__":
     main()

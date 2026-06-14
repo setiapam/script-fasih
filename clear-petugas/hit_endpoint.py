@@ -320,9 +320,19 @@ def main():
         print("[*] Dibatalkan oleh pengguna.")
         return
 
+    import datetime
+    timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_file = "execution.log"
+    
+    with open(log_file, "a", encoding="utf-8") as lf:
+        lf.write(f"\n==================================================\n")
+        lf.write(f"EKSEKUSI CLEAR PETUGAS: {timestamp_str}\n")
+        lf.write(f"==================================================\n")
+        
     # Step 3: Hapus assignment (DELETE request)
     total_deleted = 0
     total_failed = 0
+    failed_details = []
     
     print("\n[*] Memulai proses penghapusan...")
     for idx, target in enumerate(all_targets):
@@ -331,7 +341,10 @@ def main():
         email = target.get('email')
         reg_name = target.get('regionName', '-')
         
-        print(f"[{idx+1}/{len(all_targets)}] Menghapus {email} | Region: {reg_name} ({reg_code}) ... ", end="")
+        log_msg = f"[{idx+1}/{len(all_targets)}] Menghapus {email} | Region: {reg_name} ({reg_code}) ... "
+        print(log_msg, end="")
+        with open(log_file, "a", encoding="utf-8") as lf:
+            lf.write(log_msg)
         
         delete_url = f"https://fasih-sm.bps.go.id/app/api/survey-user/api/v1/allocation/{alloc_id}/{reg_code}"
         params = {
@@ -341,23 +354,51 @@ def main():
         try:
             response = requests.delete(delete_url, headers=headers, params=params, timeout=15)
             if response.status_code in (200, 201, 204):
-                print(f"[SUKSES] (Status: {response.status_code})")
+                msg = f"[SUKSES] (Status: {response.status_code})"
+                print(msg)
                 total_deleted += 1
             else:
-                print(f"[GAGAL] (Status: {response.status_code})")
+                msg = f"[GAGAL] (Status: {response.status_code})"
+                print(msg)
                 total_failed += 1
+                failed_details.append({
+                    "email": email,
+                    "region": f"{reg_name} ({reg_code})",
+                    "reason": f"Status HTTP {response.status_code}"
+                })
+            with open(log_file, "a", encoding="utf-8") as lf:
+                lf.write(msg + "\n")
         except Exception as e:
-            print(f"[ERROR] ({e})")
+            msg = f"[ERROR] ({e})"
+            print(msg)
             total_failed += 1
+            failed_details.append({
+                "email": email,
+                "region": f"{reg_name} ({reg_code})",
+                "reason": f"Exception: {e}"
+            })
+            with open(log_file, "a", encoding="utf-8") as lf:
+                lf.write(msg + "\n")
 
-
-    print("\n" + "=" * 50)
-    print("           RINGKASAN AKHIR PENGEKSEKUSIAN")
-    print("=" * 50)
-    print(f" - Berhasil diproses : {total_deleted}")
-    print(f" - Gagal diproses    : {total_failed}")
-    print(f" - Total target      : {len(all_targets)}")
-    print("=" * 50)
+    summary_lines = []
+    summary_lines.append("\n" + "=" * 50)
+    summary_lines.append("           RINGKASAN AKHIR PENGEKSEKUSIAN")
+    summary_lines.append("=" * 50)
+    summary_lines.append(f" - Berhasil diproses : {total_deleted}")
+    summary_lines.append(f" - Gagal diproses    : {total_failed}")
+    summary_lines.append(f" - Total target      : {len(all_targets)}")
+    summary_lines.append("=" * 50)
+    
+    if failed_details:
+        summary_lines.append("DETAIL KEGAGALAN:")
+        for fd in failed_details:
+            summary_lines.append(f" - Email: {fd['email']} | Region: {fd['region']} (Alasan: {fd['reason']})")
+        summary_lines.append("=" * 50)
+        
+    summary_text = "\n".join(summary_lines)
+    print(summary_text)
+    with open(log_file, "a", encoding="utf-8") as lf:
+        lf.write(summary_text + "\n")
 
 if __name__ == "__main__":
     main()
