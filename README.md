@@ -172,6 +172,19 @@ Di akhir baris eksekusi modul, wajib menampilkan ringkasan hasil dengan format t
 
 ---
 
+## Sistem Log Eksekusi (Logging)
+
+Setiap modul dilengkapi dengan sistem pencatatan log otomatis untuk memantau riwayat pemrosesan data secara mendalam:
+
+1. **Berkas Log**: Log disimpan di dalam berkas `execution.log` di dalam masing-masing folder modul (misal `approve/execution.log`).
+2. **Akumulasi Riwayat**: Log ini bertipe *append*, artinya setiap kali Anda menjalankan skrip, riwayat baru akan ditambahkan di bagian akhir file log dengan diawali *timestamp* eksekusi (seperti `EKSEKUSI APPROVE: 2026-06-14 21:10:00`).
+3. **Penyaringan Detail Summary**:
+   * Bagian ringkasan log di akhir hanya menampilkan **detail daftar target yang mengalami kegagalan** (seperti ID target, email, wilayah regional, atau nomor IDSBR, beserta pesan error/alasan penolakannya).
+   * Target yang berhasil diproses **tidak akan dicantumkan secara detail** pada rangkuman akhir log untuk menjaga ukuran berkas tetap efisien dan memudahkan pelacakan masalah (*troubleshooting*).
+4. **Keamanan Git**: Berkas `*.log` telah didaftarkan pada [.gitignore](.gitignore), sehingga log aktivitas lokal Anda tidak akan diunggah ke repositori GitHub.
+
+---
+
 ## Dokumentasi Detail Sub-Proyek
 Untuk melihat instruksi spesifik cara mendapatkan token cURL dan detail teknis masing-masing modul:
 * **[Dokumentasi Modul Approve](approve/README.md)**
