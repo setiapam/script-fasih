@@ -66,14 +66,14 @@ Bagi pengguna [mise](https://mise.jdx.dev/), versi Python Anda akan terkonfigura
 
 ## Cara Menjalankan Modul
 
-Anda dapat menjalankan skrip modul melalui runner [main.py](main.py) dengan dua cara:
+Anda dapat menjalankan skrip modul melalui runner [main.py](main.py) dengan beberapa cara:
 
 ### 1. Menggunakan Menu Interaktif (Direkomendasikan)
 Jalankan runner tanpa argumen tambahan:
 ```bash
 python main.py
 ```
-Anda akan disajikan menu interaktif untuk memilih modul mana yang ingin dieksekusi.
+Anda akan disajikan menu interaktif untuk memilih modul mana yang ingin dieksekusi, atau melihat langkah-langkah persiapan dengan memilih menu `h`.
 
 ### 2. Menjalankan Modul Secara Langsung (CLI Command)
 Tentukan nama modul sebagai argumen baris perintah pertama:
@@ -82,6 +82,19 @@ python main.py approve
 python main.py clear-assignment
 python main.py clear-petugas
 python main.py assign
+```
+
+### 3. Melihat Bantuan Langkah Persiapan (Sebelum Run Script)
+Jika Anda bingung apa saja langkah persiapan (seperti cara menyalin cURL session/token browser, format file target dll) sebelum menjalankan suatu modul, Anda dapat melihat panduan langkahnya langsung di terminal lewat perintah:
+```bash
+python main.py help <nama_modul>
+```
+Contoh perintah bantuan yang tersedia:
+```bash
+python main.py help approve
+python main.py help clear-assignment
+python main.py help clear-petugas
+python main.py help assign
 ```
 
 *Catatan: Saat modul dijalankan lewat `main.py`, runner akan otomatis mengubah direktori kerja (working directory) secara dinamis ke folder modul tersebut agar seluruh file input/output (seperti `curl.txt`, `ids.json`) dibaca dan ditulis dari dalam folder masing-masing.*
