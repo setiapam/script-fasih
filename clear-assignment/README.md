@@ -15,10 +15,10 @@ Repositori ini berisi skrip otomatisasi Python untuk mengambil data ID assignmen
 ## Prasyarat
 
 Skrip ini memerlukan:
-1. **Python 3.x** (versi terbaru direkomendasikan, dikelola menggunakan [mise](https://mise.jdx.dev/) jika ada).
-2. Library eksternal yang terdaftar pada `requirements.txt`.
+1. **Python 3.x** (versi terbaru direkomendasikan, dikelola menggunakan [mise](https://mise.jdx.dev/) di root proyek).
+2. Library eksternal yang terdaftar pada `requirements.txt` di root proyek.
 
-Instal dependensi Python dengan perintah berikut:
+Instal dependensi Python dengan perintah berikut (dijalankan dari root proyek):
 ```bash
 pip install -r requirements.txt
 ```
@@ -97,10 +97,10 @@ Apakah Anda ingin menggunakan ID yang sudah ada untuk proses clear saja? (Y/n):
 ## Struktur File Proyek
 
 - **[hit_endpoint.py](hit_endpoint.py)**: Kode utama skrip otomatisasi.
-- **[requirements.txt](requirements.txt)**: Berkas konfigurasi library dependensi (Python requests).
+- **[requirements.txt](../requirements.txt)**: Berkas konfigurasi library dependensi terpusat di root proyek.
 - **`curl_get.txt`**: File tempat menyimpan perintah cURL untuk mengambil data (*datatable*).
 - **`curl_clear.txt`**: File tempat menyimpan perintah cURL untuk menghapus alokasi (*clear assignment*).
 - **`emails.txt`**: File input opsional untuk menampung daftar email petugas yang ingin diproses sekaligus.
 - **`ids.json`**: File output yang menyimpan daftar ID yang berhasil ditarik dari API datatable.
 - **`output.txt`**: Log contoh keluaran dari skrip.
-- **[mise.toml](mise.toml)**: Konfigurasi penentu versi Python jika menggunakan runtime manager `mise`.
+- **[mise.toml](../mise.toml)**: Konfigurasi penentu versi Python jika menggunakan runtime manager `mise` terpusat di root proyek.
