@@ -27,13 +27,13 @@ Script ini digunakan untuk mengotomatiskan pencarian dan penghapusan alokasi pen
 
 ## File yang Terlibat
 
-* **[hit_endpoint.py](file:///home/murphi/Projects/script-fasih/clear-petugas/hit_endpoint.py)**: File utama script Python.
-* **[requirements.txt](file:///home/murphi/Projects/script-fasih/clear-petugas/requirements.txt)**: Berkas konfigurasi library dependensi (Python requests).
-* **[curl.txt](file:///home/murphi/Projects/script-fasih/clear-petugas/curl.txt)**: File teks untuk menempelkan perintah cURL dari browser Anda (digunakan sebagai sumber autentikasi).
-* **[petugas.txt](file:///home/murphi/Projects/script-fasih/clear-petugas/petugas.txt)**: File teks berisi daftar email petugas (satu email per baris).
-* **[pengawas.txt](file:///home/murphi/Projects/script-fasih/clear-petugas/pengawas.txt)**: File teks berisi daftar email pengawas (satu email per baris).
-* **[ids.json](file:///home/murphi/Projects/script-fasih/clear-petugas/ids.json)**: File database sementara tempat script menyimpan hasil pencarian target sebelum dihapus.
-* **[mise.toml](file:///home/murphi/Projects/script-fasih/clear-petugas/mise.toml)**: Konfigurasi penentu versi Python jika menggunakan runtime manager `mise`.
+* **[hit_endpoint.py](hit_endpoint.py)**: File utama script Python.
+* **[requirements.txt](requirements.txt)**: Berkas konfigurasi library dependensi (Python requests).
+* **[curl.txt](curl.txt)**: File teks untuk menempelkan perintah cURL dari browser Anda (digunakan sebagai sumber autentikasi).
+* **[petugas.txt](petugas.txt)**: File teks berisi daftar email petugas (satu email per baris).
+* **[pengawas.txt](pengawas.txt)**: File teks berisi daftar email pengawas (satu email per baris).
+* **[ids.json](ids.json)**: File database sementara tempat script menyimpan hasil pencarian target sebelum dihapus.
+* **[mise.toml](mise.toml)**: Konfigurasi penentu versi Python jika menggunakan runtime manager `mise`.
 
 ---
 
