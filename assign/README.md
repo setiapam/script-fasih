@@ -1,83 +1,70 @@
-# 🚀 Auto Assign FASIH BPS
+# Assign (Auto Allocation) - FASIH BPS API Automation
 
-Script Python cerdas untuk mengotomatiskan proses *assignment* (penugasan) Pencacah dan Pengawas ke daftar Sampel pada aplikasi web FASIH BPS. 
-
-Versi ini dilengkapi dengan fitur **Anti-Blokir Server**, **Smart Memory Cache**, dan **Pencarian Spesifik (On-Demand)**. Script mampu menembus batasan (*limit*) 1000 data dari server FASIH dengan cara menembak API pencarian secara spesifik menggunakan nama perusahaan atau ID sampel.
+Modul ini digunakan untuk mengotomatiskan proses *assignment* (penugasan) Pencacah (PCL) dan Pengawas (PML) ke daftar Sampel kegiatan pada aplikasi web FASIH BPS secara massal berdasarkan data input berkas Excel.
 
 ---
 
-## 🛠️ 1. Persiapan Awal
+## 📋 Alur Kerja (Workflow)
 
-Pastikan komputer/laptop kamu sudah terinstal **Python 3.x** (dapat dikelola menggunakan [mise](../mise.toml) di root proyek dengan versi Python yang sesuai).
-Instal library yang didefinisikan secara terpusat pada file [requirements.txt](../requirements.txt) di root proyek menggunakan perintah berikut:
-
-```bash
-pip install -r requirements.txt
-```
+1. **Membaca cURL & Excel**: Script membaca konfigurasi cURL (headers/cookies) dari file teks pendukung dan memuat data penugasan dari berkas Excel `assign.xlsx`.
+2. **Penarikan Cache Data**: Script mengunduh daftar Pencacah, Pengawas, dan 1000 data sampel kegiatan pertama dari server untuk disimpan dalam memori (*caching*).
+3. **Pencarian Spesifik (On-Demand)**: Jika ada ID sampel di Excel yang posisinya di atas urutan 1000 (tidak ada di memori cache), script akan memicu pencarian spesifik menggunakan nama perusahaan atau ID sampel ke API server.
+4. **Auto-Assign**: Script memasangkan PCL dan PML ke sampel yang ditemukan menggunakan request POST.
 
 ---
 
-## 📂 2. Struktur File
+## 🛠️ Prasyarat (Prerequisites)
 
-Sub-proyek ini terdiri dari berkas-berkas berikut:
-
-1. `assign.xlsx` : File Excel berisi daftar penugasan.
-2. `curl_pencacah.txt` : Berisi *copy* cURL dari *datatable* pencacah.
-3. `curl_pengawas.txt` : Berisi *copy* cURL dari *datatable* pengawas.
-4. `curl_sampel.txt` : Berisi *copy* cURL dari *datatable* sampel kegiatan.
-5. `curl_assign.txt` : Berisi *copy* cURL dari proses *assign* (simpan) manual 1x.
-6. **[hit_endpoint.py](hit_endpoint.py)** : Kode utama modul Python.
-7. **[__init__.py](__init__.py)** : Inisialisasi modul.
+* **Python 3.x** terinstal pada sistem Anda (dapat dikelola menggunakan [mise](../mise.toml) di root proyek dengan versi Python yang sesuai).
+* Library eksternal terdaftar pada berkas [requirements.txt](../requirements.txt) di root proyek. Instal menggunakan terminal di root proyek:
+  ```bash
+  pip install -r requirements.txt
+  ```
 
 ---
 
-## 📝 3. Format File Excel (`assign.xlsx`)
+## 📂 File yang Terlibat
 
-Script membaca data dalam format teks murni untuk menghindari masalah desimal (ex: `.0`). Pastikan baris pertama (Header) Excel kamu memiliki nama kolom persis seperti berikut (huruf kecil semua):
+* **[hit_endpoint.py](hit_endpoint.py)**: Kode utama script otomatisasi Python.
+* **[__init__.py](__init__.py)**: Inisialisasi modul untuk runner utama.
+* **[requirements.txt](../requirements.txt)**: Berkas konfigurasi library dependensi terpusat di root proyek (memerlukan `requests`, `pandas`, dan `openpyxl`).
+* **`assign.xlsx`**: File Excel berisi daftar penugasan.
+* **`curl_pencacah.txt`**: Salinan cURL request dari tabel pencacah.
+* **`curl_pengawas.txt`**: Salinan cURL request dari tabel pengawas.
+* **`curl_sampel.txt`**: Salinan cURL request dari tabel sampel kegiatan.
+* **`curl_assign.txt`**: Salinan cURL request dari aksi assign manual 1x.
+* **[mise.toml](../mise.toml)**: Konfigurasi runtime tool manager `mise` terpusat di root proyek.
 
+---
+
+## 🚀 Panduan Penggunaan (Step-by-Step)
+
+### Langkah 1: Siapkan Autentikasi (cURL)
+Dapatkan 4 jenis file cURL dari browser Anda (Developer Tools F12 -> Network tab -> Klik Kanan -> Copy as cURL (bash)):
+1. **`curl_pencacah.txt`**: Salin request bernama `datatable?...` dari tabel pencacah.
+2. **`curl_pengawas.txt`**: Salin request bernama `datatable?...` dari tabel pengawas.
+3. **`curl_sampel.txt`**: Salin request bernama `datatable?...` dari tabel sampel kegiatan.
+4. **`curl_assign.txt`**: Lakukan uji coba assign manual 1x, lalu salin request bernama `assign-by-selection/...`.
+
+### Langkah 2: Siapkan Berkas Excel (`assign.xlsx`)
+Pastikan baris pertama (Header) Excel memiliki nama kolom persis seperti berikut (huruf kecil semua):
 * `idsbr` : ID Sampel target.
 * `email_pencacah` : Email petugas pencacah.
 * `email_pengawas` : Email petugas pengawas.
-* `perusahaan` : Nama Perusahaan/Usaha *(Opsional tapi **SANGAT DISARANKAN**)*. Kolom ini digunakan oleh script sebagai "Kunci Pencarian Cadangan" jika `idsbr` gagal ditemukan di 1000 data pertama.
+* `perusahaan` : Nama Perusahaan/Usaha (sebagai backup jika idsbr tidak ada di 1000 data pertama).
 
----
-
-## 🕵️ 4. Cara Mengambil cURL dari FASIH
-
-Script ini membutuhkan data *Cookie* dan *Token* untuk masing-masing aksi agar tidak terjadi *Cookie Mismatch* (Error 401).
-
-**Langkah-langkah mendapatkan cURL:**
-1. Login ke web FASIH menggunakan browser.
-2. Tekan **F12** untuk membuka *Developer Tools* -> tab **Network**. (Pastikan tombol *recording* merah menyala).
-3. Buka halaman Assignment di web FASIH.
-4. **cURL Pencacah:** Filter/klik tabel pencacah. Cari *request* bernama `datatable?...`. Klik Kanan -> **Copy** -> **Copy as cURL (bash)**. Paste isinya ke `curl_pencacah.txt`.
-5. **cURL Pengawas:** Lakukan hal yang sama pada tabel pengawas, paste ke `curl_pengawas.txt`.
-6. **cURL Sampel:** Lakukan hal yang sama pada tabel sampel, paste ke `curl_sampel.txt`. *(Pastikan ini adalah cURL yang paling baru agar sesi tetap fresh!)*
-7. **cURL Assign:** Lakukan uji coba 1 kali *assign* manual di web. Cari *request* bernama `assign-by-selection/...`. Copy sebagai cURL dan paste ke `curl_assign.txt`.
-
----
-
-## ▶️ 5. Cara Menjalankan Script
-
-Buka Terminal di root direktori proyek, lalu jalankan:
-
+### Langkah 3: Jalankan Modul
+Buka terminal Anda di root direktori proyek, lalu jalankan:
 ```bash
 python main.py assign
 ```
 
-### 🧠 Bagaimana Cara Script Ini Bekerja?
-1. **Caching Aman:** Script akan menyedot data Pencacah, Pengawas, dan 1000 Sampel pertama (dengan limit 500 per tarikan agar tidak diblokir server).
-2. **Auto-Export:** Data hasil tarikan akan disimpan otomatis menjadi file `data_pencacah.csv`, `data_pengawas.csv`, dan `data_sampel.csv` sebagai bukti/referensi.
-3. **On-Demand Search:** Jika ada sampel di Excel yang posisinya di atas urutan 1000 (tidak ada di *cache*), script akan otomatis mengetikkan **Nama Perusahaan** (atau IDSBR) ke kolom *Search* server untuk menemukannya secara paksa.
-4. **Auto-Assign:** Script memasangkan PCL dan PML ke sampel yang ditemukan.
-5. **Reporting:** Di akhir proses, script akan membuat file `laporan_hasil_assign.csv` yang berisi status sukses/gagal dari setiap IDSBR.
-
 ---
 
-## ⚠️ 6. Troublehsooting (Masalah yang Sering Terjadi)
+## 📝 Penjelasan Status Hasil Eksekusi & Logging
 
-1. **Error HTTP 401 (Unauthorized) / Sesi Expired:**
-   Jika script gagal ditarik atau gagal assign dengan status `401`, berarti sesi FASIH kamu sudah habis/ter-logout. 
-   **Solusi:** Refresh web FASIH, ambil ulang cURL Sampel / Assign yang baru dari *Inspect Element*, lalu *paste* ulang ke file teksnya.
-2. **Sampel BENAR-BENAR Tidak Ditemukan:**
-   Jika script sudah mencoba mencari spesifik menggunakan nama perusahaan dan IDSBR tapi tetap gagal, berarti data tersebut memang belum diturunkan ke wilayah/survei tersebut di database server. Silakan cek file `laporan_hasil_assign.csv` untuk melihat daftar sampel yang gagal diproses.
+* **`[SUKSES]`**: Proses assign/pemasangan PCL dan PML ke sampel berhasil (HTTP status 200 atau 201).
+* **`[GAGAL]`**: Proses dilewati (*skip*) karena sampel/petugas tidak ditemukan atau server menolak request.
+* **`[ERROR]`**: Terjadi masalah teknis atau gangguan koneksi saat pemanggilan API.
+
+Seluruh riwayat eksekusi akan dicatat secara otomatis ke berkas `execution.log` di dalam folder ini (diabaikan dari Git).
