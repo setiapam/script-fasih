@@ -221,9 +221,19 @@ def main():
     if KOLOM_PERUSAHAAN not in kolom_tersedia:
         print(f"⚠️ Peringatan: Kolom '{KOLOM_PERUSAHAAN}' tidak ditemukan di Excel. Pencarian sekunder dimatikan.")
         
+    import datetime
+    timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_file = "execution.log"
+    
+    with open(log_file, "a", encoding="utf-8") as lf:
+        lf.write(f"\n==================================================\n")
+        lf.write(f"EKSEKUSI ASSIGN: {timestamp_str}\n")
+        lf.write(f"==================================================\n")
+        
     sukses = 0
     gagal = 0
     log_assignment = []
+    failed_details = []
     
     print("\nMulai proses Assignment...")
     for index, row in df.iterrows():
@@ -244,18 +254,29 @@ def main():
             if nama_perusahaan.lower() == 'nan':
                 nama_perusahaan = ""
         
+        log_msg = f"Memproses baris {index+1} | IDSBR: {sampel_excel} | PCL: {email_pcl} | PML: {email_pml}"
+        print(log_msg)
+        with open(log_file, "a", encoding="utf-8") as lf:
+            lf.write(log_msg + "\n")
+            
         sample_id = dict_sampel.get(sampel_excel)
         
         # JIKA GAGAL DITEMUKAN DI CACHE: Lakukan Pencarian On-Demand
         if not sample_id:
             # Utamakan cari berdasarkan Nama Perusahaan
             if nama_perusahaan:
-                print(f"🔍 [Pencarian Perusahaan] Mencari: '{nama_perusahaan}' (IDSBR: {sampel_excel})...")
+                p_msg = f"🔍 [Pencarian Perusahaan] Mencari: '{nama_perusahaan}' (IDSBR: {sampel_excel})..."
+                print(p_msg)
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    lf.write(p_msg + "\n")
                 sample_id = fetch_single_sample_on_demand(url_sampel, headers_sampel, survey_period_id, keyword=nama_perusahaan, target_idsbr=sampel_excel)
             
             # Jika perusahaan kosong atau tidak ketemu, Fallback cari pakai angka IDSBR-nya sendiri
             if not sample_id:
-                print(f"🔍 [Pencarian IDSBR] Mencari fallback: {sampel_excel}...")
+                f_msg = f"🔍 [Pencarian IDSBR] Mencari fallback: {sampel_excel}..."
+                print(f_msg)
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    lf.write(f_msg + "\n")
                 sample_id = fetch_single_sample_on_demand(url_sampel, headers_sampel, survey_period_id, keyword=sampel_excel, target_idsbr=sampel_excel)
 
             if sample_id:
@@ -265,19 +286,31 @@ def main():
         pml_id = dict_pengawas.get(email_pml)
         
         if not sample_id:
-            print(f" -> [GAGAL] Lewati {sampel_excel}: Sampel tidak ditemukan meski sudah dicari manual.")
+            msg = f" -> [GAGAL] Lewati {sampel_excel}: Sampel tidak ditemukan meski sudah dicari manual."
+            print(msg)
             gagal += 1
             log_assignment.append({"IDSBR": sampel_excel, "Status": "Gagal - Sampel tidak ada di server"})
+            failed_details.append({"idsbr": sampel_excel, "reason": "Sampel tidak ditemukan di server"})
+            with open(log_file, "a", encoding="utf-8") as lf:
+                lf.write(msg + "\n")
             continue
         if not pcl_id:
-            print(f" -> [GAGAL] Lewati {sampel_excel}: Pencacah '{email_pcl}' tidak ditemukan.")
+            msg = f" -> [GAGAL] Lewati {sampel_excel}: Pencacah '{email_pcl}' tidak ditemukan."
+            print(msg)
             gagal += 1
             log_assignment.append({"IDSBR": sampel_excel, "Status": f"Gagal - PCL {email_pcl} tidak ada"})
+            failed_details.append({"idsbr": sampel_excel, "reason": f"Pencacah '{email_pcl}' tidak terdaftar"})
+            with open(log_file, "a", encoding="utf-8") as lf:
+                lf.write(msg + "\n")
             continue
         if not pml_id:
-            print(f" -> [GAGAL] Lewati {sampel_excel}: Pengawas '{email_pml}' tidak ditemukan.")
+            msg = f" -> [GAGAL] Lewati {sampel_excel}: Pengawas '{email_pml}' tidak ditemukan."
+            print(msg)
             gagal += 1
             log_assignment.append({"IDSBR": sampel_excel, "Status": f"Gagal - PML {email_pml} tidak ada"})
+            failed_details.append({"idsbr": sampel_excel, "reason": f"Pengawas '{email_pml}' tidak terdaftar"})
+            with open(log_file, "a", encoding="utf-8") as lf:
+                lf.write(msg + "\n")
             continue
             
         # 3. Eksekusi Assign
@@ -292,27 +325,48 @@ def main():
         try:
             assign_req = requests.post(url_assign, headers=headers_assign, json=assign_payload, timeout=15)
             if assign_req.status_code in [200, 201]:
-                print(f" -> [SUKSES] Berhasil Assign - {sampel_excel} | PCL: {email_pcl}, PML: {email_pml} (Status: {assign_req.status_code})")
+                msg = f" -> [SUKSES] Berhasil Assign - {sampel_excel} | PCL: {email_pcl}, PML: {email_pml} (Status: {assign_req.status_code})"
+                print(msg)
                 sukses += 1
                 log_assignment.append({"IDSBR": sampel_excel, "Status": "Berhasil"})
             else:
-                print(f" -> [GAGAL] Gagal Assign - {sampel_excel} | Server merespon: {assign_req.status_code}")
+                msg = f" -> [GAGAL] Gagal Assign - {sampel_excel} | Server merespon: {assign_req.status_code}"
+                print(msg)
                 gagal += 1
                 log_assignment.append({"IDSBR": sampel_excel, "Status": f"Gagal HTTP {assign_req.status_code}"})
+                failed_details.append({"idsbr": sampel_excel, "reason": f"HTTP Status {assign_req.status_code}"})
+            with open(log_file, "a", encoding="utf-8") as lf:
+                lf.write(msg + "\n")
         except Exception as e:
-            print(f" -> [ERROR] Terjadi kesalahan saat assign {sampel_excel}: {e}")
+            msg = f" -> [ERROR] Terjadi kesalahan saat assign {sampel_excel}: {e}"
+            print(msg)
             gagal += 1
             log_assignment.append({"IDSBR": sampel_excel, "Status": f"Error: {e}"})
+            failed_details.append({"idsbr": sampel_excel, "reason": f"Exception: {e}"})
+            with open(log_file, "a", encoding="utf-8") as lf:
+                lf.write(msg + "\n")
             
         time.sleep(0.1) 
 
-    print("\n" + "=" * 50)
-    print("           RINGKASAN AKHIR PENGEKSEKUSIAN")
-    print("=" * 50)
-    print(f" - Berhasil diproses : {sukses}")
-    print(f" - Gagal diproses    : {gagal}")
-    print(f" - Total target      : {sukses + gagal}")
-    print("=" * 50)
+    summary_lines = []
+    summary_lines.append("\n" + "=" * 50)
+    summary_lines.append("           RINGKASAN AKHIR PENGEKSEKUSIAN")
+    summary_lines.append("=" * 50)
+    summary_lines.append(f" - Berhasil diproses : {sukses}")
+    summary_lines.append(f" - Gagal diproses    : {gagal}")
+    summary_lines.append(f" - Total target      : {sukses + gagal}")
+    summary_lines.append("=" * 50)
+    
+    if failed_details:
+        summary_lines.append("DETAIL KEGAGALAN:")
+        for fd in failed_details:
+            summary_lines.append(f" - IDSBR: {fd['idsbr']} (Alasan: {fd['reason']})")
+        summary_lines.append("=" * 50)
+        
+    summary_text = "\n".join(summary_lines)
+    print(summary_text)
+    with open(log_file, "a", encoding="utf-8") as lf:
+        lf.write(summary_text + "\n")
     
     if log_assignment:
         df_log = pd.DataFrame(log_assignment)
