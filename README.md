@@ -124,6 +124,30 @@ Jika modul baru Anda memerlukan pustaka python eksternal (misalnya `pandas`), ta
 
 ---
 
+## Standardisasi Output Modul
+
+Setiap modul wajib mengikuti standar format output terminal (log) berikut agar pemantauan hasil eksekusi sukses dan gagal dapat dipantau secara konsisten:
+
+### 1. Label Status Pemrosesan
+Selama iterasi pemrosesan target, wajib menggunakan indikator penunjuk status berikut:
+* **`[SUKSES]`**: Untuk request yang berhasil diselesaikan oleh server (misalnya kode HTTP `200`, `201`, `204`).
+* **`[GAGAL]`**: Untuk request yang ditolak oleh server karena kendala bisnis/validasi (misalnya kode HTTP `400`, `403`, `500`).
+* **`[ERROR]`**: Untuk penanganan pengecualian (*exception*) teknis seperti *timeout* atau putusnya koneksi internet.
+
+### 2. Format Ringkasan Akhir (Summary)
+Di akhir baris eksekusi modul, wajib menampilkan ringkasan hasil dengan format teks persis seperti ini:
+```text
+==================================================
+           RINGKASAN AKHIR PENGEKSEKUSIAN
+==================================================
+ - Berhasil diproses : <jumlah_sukses>
+ - Gagal diproses    : <jumlah_gagal_dan_error>
+ - Total target      : <total_target_data>
+==================================================
+```
+
+---
+
 ## Dokumentasi Detail Sub-Proyek
 Untuk melihat instruksi spesifik cara mendapatkan token cURL dan detail teknis masing-masing modul:
 * **[Dokumentasi Modul Approve](approve/README.md)**

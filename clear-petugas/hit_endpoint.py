@@ -341,7 +341,7 @@ def main():
         try:
             response = requests.delete(delete_url, headers=headers, params=params, timeout=15)
             if response.status_code in (200, 201, 204):
-                print(f"[OK] (Status: {response.status_code})")
+                print(f"[SUKSES] (Status: {response.status_code})")
                 total_deleted += 1
             else:
                 print(f"[GAGAL] (Status: {response.status_code})")
@@ -354,9 +354,9 @@ def main():
     print("\n" + "=" * 50)
     print("           RINGKASAN AKHIR PENGEKSEKUSIAN")
     print("=" * 50)
-    print(f" - Berhasil dihapus : {total_deleted}")
-    print(f" - Gagal dihapus    : {total_failed}")
-    print(f" - Sisa target      : {len(all_targets) - total_deleted - total_failed}")
+    print(f" - Berhasil diproses : {total_deleted}")
+    print(f" - Gagal diproses    : {total_failed}")
+    print(f" - Total target      : {len(all_targets)}")
     print("=" * 50)
 
 if __name__ == "__main__":
