@@ -19,6 +19,11 @@ MODULES = {
         "name": "clear-petugas",
         "title": "Clear Petugas (Hapus Alokasi Per Petugas/Pengawas)",
         "desc": "Menghapus alokasi wilayah regional penugasan petugas/pengawas secara spesifik."
+    },
+    "4": {
+        "name": "assign",
+        "title": "Assign (Auto Allocation)",
+        "desc": "Mengotomatiskan assignment Pencacah/Pengawas ke sampel berdasarkan assign.xlsx."
     }
 }
 

@@ -29,13 +29,23 @@ Proyek ini telah direstrukturisasi sehingga semua skrip di dalam sub-folder berf
 │   ├── emails.txt
 │   └── ids.json
 │
-└── clear-petugas/           # Modul: Clear Region Petugas & Pengawas
+├── clear-petugas/           # Modul: Clear Region Petugas & Pengawas
+│   ├── __init__.py
+│   ├── hit_endpoint.py
+│   ├── curl.txt
+│   ├── petugas.txt
+│   ├── pengawas.txt
+│   └── ids.json
+│
+└── assign/                  # Modul: Auto Allocation (Assign)
     ├── __init__.py
     ├── hit_endpoint.py
-    ├── curl.txt
-    ├── petugas.txt
-    ├── pengawas.txt
-    └── ids.json
+    ├── curl_assign.txt
+    ├── curl_pencacah.txt
+    ├── curl_pengawas.txt
+    ├── curl_sampel.txt
+    ├── assign.xlsx
+    └── data_pencacah.csv
 ```
 
 ---
@@ -71,6 +81,7 @@ Tentukan nama modul sebagai argumen baris perintah pertama:
 python main.py approve
 python main.py clear-assignment
 python main.py clear-petugas
+python main.py assign
 ```
 
 *Catatan: Saat modul dijalankan lewat `main.py`, runner akan otomatis mengubah direktori kerja (working directory) secara dinamis ke folder modul tersebut agar seluruh file input/output (seperti `curl.txt`, `ids.json`) dibaca dan ditulis dari dalam folder masing-masing.*
@@ -153,3 +164,5 @@ Untuk melihat instruksi spesifik cara mendapatkan token cURL dan detail teknis m
 * **[Dokumentasi Modul Approve](approve/README.md)**
 * **[Dokumentasi Modul Clear Assignment](clear-assignment/README.md)**
 * **[Dokumentasi Modul Clear Petugas](clear-petugas/README.md)**
+* **[Dokumentasi Modul Assign](assign/README.md)**
+
