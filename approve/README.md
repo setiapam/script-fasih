@@ -1,31 +1,34 @@
-# Fasih BPS Bulk Assignment Approval Automation
+# Approve (Bulk Approval) - FASIH BPS API Automation
 
-Script ini digunakan untuk mengotomatiskan persetujuan (approval) penugasan (*assignment*) pada sistem Fasih BPS secara massal menggunakan API internal.
+Modul ini digunakan untuk mengotomatiskan persetujuan (*approval*) penugasan (*assignment*) pada sistem internal FASIH BPS secara massal berdasarkan daftar target ID penugasan.
 
-## Alur Kerja Script (Workflow)
+---
 
-1. **Autentikasi & Konfigurasi**: Script membaca perintah cURL dari [curl.txt](curl.txt) untuk mengambil cookies sesi browser aktif dan headers HTTP. Header `Content-Type` bawaan dari cURL akan diabaikan agar library `requests` Python dapat menyusun format `multipart/form-data` dengan *boundary* yang tepat secara dinamis.
+## 📋 Alur Kerja (Workflow)
+
+1. **Autentikasi & Konfigurasi**: Script membaca perintah cURL dari [curl.txt](curl.txt) untuk mengambil cookies sesi browser aktif dan headers HTTP.
 2. **Membaca Target Approval**: Script membaca daftar ID assignment dari [ids.json](ids.json).
 3. **Eksekusi Approval**: Script melakukan POST request secara berurutan ke API Endpoint Approval (`https://fasih-sm.bps.go.id/assignment-approval/api/v2/approval`) untuk setiap ID yang tertera dengan data payload:
-   - `assignmentId`: `<ID dari ids.json>`
+   - `assignmentId`: ID dari `ids.json`
    - `statusApproval`: `true`
    - `comment`: `{"dataKey":"","notes":[]}`
 
 ---
 
-## Persyaratan (Prerequisites)
+## 🛠️ Prasyarat (Prerequisites)
 
 * **Python 3.x** terinstal pada sistem Anda (dapat dikelola menggunakan [mise](../mise.toml) di root proyek dengan versi Python yang sesuai).
-* Library eksternal yang dibutuhkan dapat diinstal menggunakan terminal dengan perintah (dijalankan dari root proyek):
+* Library eksternal terdaftar pada berkas [requirements.txt](../requirements.txt) di root proyek. Instal menggunakan terminal di root proyek:
   ```bash
   pip install -r requirements.txt
   ```
 
 ---
 
-## File yang Terlibat
+## 📂 File yang Terlibat
 
 * **[hit_endpoint.py](hit_endpoint.py)**: Kode utama script otomatisasi Python.
+* **[__init__.py](__init__.py)**: Inisialisasi modul untuk runner utama.
 * **[requirements.txt](../requirements.txt)**: Berkas konfigurasi library dependensi terpusat di root proyek.
 * **[curl.txt](curl.txt)**: Tempat menempelkan salinan perintah cURL dari browser Anda (berfungsi sebagai sumber autentikasi sesi).
 * **[ids.json](ids.json)**: Berkas JSON berisi daftar objek dengan key `"id"` yang merupakan ID penugasan yang ingin disetujui secara massal.
@@ -33,15 +36,15 @@ Script ini digunakan untuk mengotomatiskan persetujuan (approval) penugasan (*as
 
 ---
 
-## Cara Penggunaan (Step-by-Step)
+## 🚀 Panduan Penggunaan (Step-by-Step)
 
 ### Langkah 1: Siapkan Autentikasi (`curl.txt`)
-1. Buka browser Anda dan login ke sistem Fasih BPS.
+1. Buka browser Anda dan login ke sistem FASIH BPS.
 2. Buka **Developer Tools** (tekan **F12** atau klik kanan -> **Inspect**) lalu navigasi ke tab **Network**.
 3. Lakukan aksi persetujuan (approval) pada salah satu assignment secara manual di web untuk memicu request API.
 4. Cari request API yang mengarah ke `https://fasih-sm.bps.go.id/assignment-approval/api/v2/approval`.
 5. Klik kanan pada request tersebut -> Pilih **Copy** -> **Copy as cURL (bash)**.
-6. Buka berkas [curl.txt](curl.txt) di folder `approve`, hapus isi lamanya, kemudian **paste** perintah cURL tersebut dan simpan.
+6. Buka berkas [curl.txt](curl.txt), hapus isi lamanya, kemudian **paste** perintah cURL tersebut dan simpan.
 
 ### Langkah 2: Siapkan Daftar ID Target (`ids.json`)
 1. Buka berkas [ids.json](ids.json).
@@ -53,18 +56,18 @@ Script ini digunakan untuk mengotomatiskan persetujuan (approval) penugasan (*as
    ]
    ```
 
-### Langkah 3: Jalankan Script
-Buka terminal Anda di direktori folder `approve`, lalu jalankan perintah berikut:
+### Langkah 3: Jalankan Modul
+Buka terminal Anda di root direktori proyek, lalu jalankan:
 ```bash
-python hit_endpoint.py
+python main.py approve
 ```
-
-Script akan memproses satu per satu ID yang ada di dalam `ids.json` dan menampilkan status respons dari server.
 
 ---
 
-## Penjelasan Status HTTP saat Eksekusi
+## 📝 Penjelasan Status Hasil Eksekusi & Logging
 
-* **`Status HTTP: 200` / `201`**: Proses approval berhasil dilakukan untuk assignment tersebut.
-* **`Status HTTP: 401` / `403`**: Sesi autentikasi Anda di [curl.txt](curl.txt) telah kedaluwarsa atau tidak valid. Silakan salin ulang perintah cURL yang baru dari browser Anda.
-* **`Status HTTP: 500` / `400`**: Terjadi kesalahan dari sisi server atau parameter request yang tidak sesuai.
+* **`[SUKSES]`**: Proses approval berhasil dilakukan untuk assignment tersebut (HTTP status 200 atau 201).
+* **`[GAGAL]`**: Proses approval ditolak oleh server (misalnya HTTP status 400 atau 500 karena parameter tidak sesuai atau session kedaluwarsa).
+* **`[ERROR]`**: Terjadi gangguan jaringan atau masalah teknis (RequestException).
+
+Seluruh riwayat eksekusi akan dicatat secara otomatis ke berkas `execution.log` di dalam folder ini (diabaikan dari Git).
