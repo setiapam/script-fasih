@@ -8,15 +8,15 @@ Repositori monorepo ini berisi kumpulan skrip otomatisasi Python untuk membantu 
 
 Repository ini terdiri dari 3 sub-proyek (folder):
 
-### 1. **[Approve (Bulk Approval)](file:///home/murphi/Projects/script-fasih/approve/README.md)**
+### 1. **[Approve (Bulk Approval)](approve/README.md)**
 * **Lokasi Folder**: `approve/`
 * **Deskripsi**: Mengotomatiskan proses persetujuan (*approval*) massal penugasan (*assignment*) berdasarkan daftar ID penugasan yang terdapat pada file `ids.json` dengan mengirimkan request POST multipart/form-data.
 
-### 2. **[Clear Assignment](file:///home/murphi/Projects/script-fasih/clear-assignment/README.md)**
+### 2. **[Clear Assignment](clear-assignment/README.md)**
 * **Lokasi Folder**: `clear-assignment/`
 * **Deskripsi**: Menarik semua ID assignment secara paginasi (page-by-page) dari API datatable lalu melakukan penghapusan alokasi penugasan secara massal (batching per 100 data) berdasarkan daftar email petugas/pengawas yang terdaftar di berkas `emails.txt`.
 
-### 3. **[Clear Petugas](file:///home/murphi/Projects/script-fasih/clear-petugas/README.md)**
+### 3. **[Clear Petugas](clear-petugas/README.md)**
 * **Lokasi Folder**: `clear-petugas/`
 * **Deskripsi**: Mengotomatiskan pencarian `userId` dan regional penugasan petugas (`petugas.txt`) serta pengawas (`pengawas.txt`), mengumpulkan seluruh ID regional target alokasi mereka ke dalam berkas `ids.json`, lalu menghapusnya (*clear*) secara massal satu per satu.
 
@@ -50,6 +50,6 @@ Setiap folder proyek juga dilengkapi berkas `mise.toml` bagi Anda yang menggunak
 
 Untuk melihat panduan penyiapan autentikasi via `curl.txt`, format payload `ids.json` atau file konfigurasi lainnya, silakan baca dokumentasi README spesifik pada tautan berikut:
 
-* **[Dokumentasi Proyek Approve](file:///home/murphi/Projects/script-fasih/approve/README.md)**
-* **[Dokumentasi Proyek Clear Assignment](file:///home/murphi/Projects/script-fasih/clear-assignment/README.md)**
-* **[Dokumentasi Proyek Clear Petugas](file:///home/murphi/Projects/script-fasih/clear-petugas/README.md)**
+* **[Dokumentasi Proyek Approve](approve/README.md)**
+* **[Dokumentasi Proyek Clear Assignment](clear-assignment/README.md)**
+* **[Dokumentasi Proyek Clear Petugas](clear-petugas/README.md)**

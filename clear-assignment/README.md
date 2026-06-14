@@ -96,11 +96,11 @@ Apakah Anda ingin menggunakan ID yang sudah ada untuk proses clear saja? (Y/n):
 
 ## Struktur File Proyek
 
-- **[hit_endpoint.py](file:///home/murphi/Projects/script-fasih/clear-assignment/hit_endpoint.py)**: Kode utama skrip otomatisasi.
-- **[requirements.txt](file:///home/murphi/Projects/script-fasih/clear-assignment/requirements.txt)**: Berkas konfigurasi library dependensi (Python requests).
+- **[hit_endpoint.py](hit_endpoint.py)**: Kode utama skrip otomatisasi.
+- **[requirements.txt](requirements.txt)**: Berkas konfigurasi library dependensi (Python requests).
 - **`curl_get.txt`**: File tempat menyimpan perintah cURL untuk mengambil data (*datatable*).
 - **`curl_clear.txt`**: File tempat menyimpan perintah cURL untuk menghapus alokasi (*clear assignment*).
 - **`emails.txt`**: File input opsional untuk menampung daftar email petugas yang ingin diproses sekaligus.
 - **`ids.json`**: File output yang menyimpan daftar ID yang berhasil ditarik dari API datatable.
 - **`output.txt`**: Log contoh keluaran dari skrip.
-- **[mise.toml](file:///home/murphi/Projects/script-fasih/clear-assignment/mise.toml)**: Konfigurasi penentu versi Python jika menggunakan runtime manager `mise`.
+- **[mise.toml](mise.toml)**: Konfigurasi penentu versi Python jika menggunakan runtime manager `mise`.
