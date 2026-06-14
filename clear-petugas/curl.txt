@@ -1,0 +1,15 @@
+curl 'https://fasih-sm.bps.go.id/app/api/survey-user/api/v1/allocations-view/by-user?surveyRoleId=6d7d919a-45e5-4779-bb87-2905b49fd31a&surveyPeriodId=fd68e454-ba45-4b85-8205-f3bf777ded24&page=0&size=10&keyword=nielasabrina2%40gmail.co' \
+  -H 'Accept: */*' \
+  -H 'Accept-Language: en-US,en;q=0.5' \
+  -H 'Connection: keep-alive' \
+  -b 'f5avraaaaaaaaaaaaaaaa_session_=CHJDLKOPNNCGKDEEGEBMPEIKNNMICLBLGNCCPEHDCOPFKFNNOFHOEGCIKCEJPFHBMCEDMCNBEGKNADNLHNHACDNECGAHEAPGKGHJCKDJLBKHKIIMCJEOLIMKJHFMGPPM; f5_cspm=1234; f5avraaaaaaaaaaaaaaaa_session_=OLJFFMPGGOMKOMDDDGBCJAJABLFILAIKKOBHJGGBHFFEGKOHOLMIOBFPCGOBHBFOMACDBLLAFMJPDFCLOGKAFJGFBFAAHIDHICJAMHNCPCMDNBMHCALKBNFFOABDLOAB; cf_clearance=SGF_Ra.eAhy.TMJhYQm_p5CMcKuONrjIDOzCxBGFCzU-1780848787-1.2.1.1-qVo2gWnXwsAvYhOsqgQWjmriEdgLS0BJXQ9jDw.mqEr7iyUjngjvC4dP55Fn3Ti5EKeVZbq3U0YqQW6b27S9sLEkVhJV3uDLseKDfNhfpvgybvbM_upfOHHyemxceUdnsY0KGJLHpOAZLxRDaYYg6JjKKMyvr2Z2kgpQwpfaAhea0wjkC4YdmffkxA_zRovJzS92aeN8iGozU95euNnFgaQX_zfJy9Xnc9dEd0c_kg4_3ZHO5QXpQWNHIdZH1BmSaP7A7rD_DPtigzwjHTD9MdhBRhwSgEaT6X4q4kKr48X49D6.Pp1q74pvIS5dU_9XSvHjNZdqpb6XcuNM.19qPg; db8ca2b43ed851cc93e71fd5fd72bff7=15faddc55339961e726413df06a9e1dc; XSRF-TOKEN=71b7fff4-9a00-4b66-90cf-9e50045d1ff9; SESSION=cc0e3bb3-eacd-48af-abb8-6e07ace2f0f4; f5avraaaaaaaaaaaaaaaa_session_=NMLAKIBAMBFJLKHLOELEHIGFIOBDDEKMDBPPKJNFDOCMKJEOGCMAGHCEAHCNPMLHPAKDCPMMMLMEFEFOOBPAGDJNPFBGDNBNEOFICOHLGBEBOEBNDPONILDJOMMAJDAJ; TS01bafd94=01266d26d077497877604467b9c2d6f4674a42c4bf9440e49e96ed600012e45e54f9d5d9f40fdc61c59d6a3f3b6b77bf4e3fe54d2b; TS5d9b593f027=0868f8be6fab2000fbbe67c16294969001ce6e12a5b4569faa4668cba34b6446fcc40dc911e2dee808b058c6a0113000c1b91619c5306bae80d4a81749dc3da789a54cb575dbf539d382eaa9efc4871cf3d5acf670dda4f247a4fb9deb9818ae' \
+  -H 'DNT: 1' \
+  -H 'Sec-Fetch-Dest: empty' \
+  -H 'Sec-Fetch-Mode: cors' \
+  -H 'Sec-Fetch-Site: same-origin' \
+  -H 'Sec-GPC: 1' \
+  -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36' \
+  -H 'X-XSRF-TOKEN: 71b7fff4-9a00-4b66-90cf-9e50045d1ff9' \
+  -H 'sec-ch-ua: "Brave";v="149", "Chromium";v="149", "Not)A;Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "Linux"'

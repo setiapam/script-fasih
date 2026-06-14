@@ -1,0 +1,18 @@
+curl 'https://fasih-sm.bps.go.id/app/api/assignment-general/api/clear-assignment-user' \
+  -H 'Accept: */*' \
+  -H 'Accept-Language: en-US,en;q=0.5' \
+  -H 'Connection: keep-alive' \
+  -H 'Content-Type: application/json' \
+  -b 'f5avraaaaaaaaaaaaaaaa_session_=AAEGBJHNIGHOINDCJDIEEELADEMBCIEMOMNPAANBABMLBIIHNIJHNGJJNGBMKMMDPGGDDBJMMFPJFMPCFCEAKGMIGIEJBJABCCGCPNENPIBPJCJOFKJANMAALNJMOJMM; f5_cspm=1234; f5avraaaaaaaaaaaaaaaa_session_=OLJFFMPGGOMKOMDDDGBCJAJABLFILAIKKOBHJGGBHFFEGKOHOLMIOBFPCGOBHBFOMACDBLLAFMJPDFCLOGKAFJGFBFAAHIDHICJAMHNCPCMDNBMHCALKBNFFOABDLOAB; cf_clearance=SGF_Ra.eAhy.TMJhYQm_p5CMcKuONrjIDOzCxBGFCzU-1780848787-1.2.1.1-qVo2gWnXwsAvYhOsqgQWjmriEdgLS0BJXQ9jDw.mqEr7iyUjngjvC4dP55Fn3Ti5EKeVZbq3U0YqQW6b27S9sLEkVhJV3uDLseKDfNhfpvgybvbM_upfOHHyemxceUdnsY0KGJLHpOAZLxRDaYYg6JjKKMyvr2Z2kgpQwpfaAhea0wjkC4YdmffkxA_zRovJzS92aeN8iGozU95euNnFgaQX_zfJy9Xnc9dEd0c_kg4_3ZHO5QXpQWNHIdZH1BmSaP7A7rD_DPtigzwjHTD9MdhBRhwSgEaT6X4q4kKr48X49D6.Pp1q74pvIS5dU_9XSvHjNZdqpb6XcuNM.19qPg; db8ca2b43ed851cc93e71fd5fd72bff7=15faddc55339961e726413df06a9e1dc; XSRF-TOKEN=71b7fff4-9a00-4b66-90cf-9e50045d1ff9; SESSION=cc0e3bb3-eacd-48af-abb8-6e07ace2f0f4; f5avraaaaaaaaaaaaaaaa_session_=NMLAKIBAMBFJLKHLOELEHIGFIOBDDEKMDBPPKJNFDOCMKJEOGCMAGHCEAHCNPMLHPAKDCPMMMLMEFEFOOBPAGDJNPFBGDNBNEOFICOHLGBEBOEBNDPONILDJOMMAJDAJ; TS01bafd94=01266d26d0d976cb305d31a6d71ecb8bb7bcded739a33113f5163663ccad2d09f125361ca9d7616947a2ce5e5d6106b0a76cbbbb3e; TS5d9b593f027=0868f8be6fab2000cd0215657da0d43c3b0384273458eee2df94a0cc1b5603b60249a07f7c54e25508e63cc0b41130001b4e5b56fb2348419c81bd791bf62cc74c920da0b3ecba5d214ed9027af307f3277bf38249f28728c6f0faf7a8008a14' \
+  -H 'DNT: 1' \
+  -H 'Origin: https://fasih-sm.bps.go.id' \
+  -H 'Sec-Fetch-Dest: empty' \
+  -H 'Sec-Fetch-Mode: cors' \
+  -H 'Sec-Fetch-Site: same-origin' \
+  -H 'Sec-GPC: 1' \
+  -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36' \
+  -H 'X-XSRF-TOKEN: 71b7fff4-9a00-4b66-90cf-9e50045d1ff9' \
+  -H 'sec-ch-ua: "Brave";v="149", "Chromium";v="149", "Not)A;Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "Linux"' \
+  --data-raw '["ce5713c0-d145-432e-b84a-96640782785e"]'
