@@ -58,6 +58,9 @@ def main():
     print(f"[*] Memulai proses approval untuk {len(ids)} ID...\n")
     print("-" * 40)
     
+    total_success = 0
+    total_failed = 0
+    
     for idx, item in enumerate(ids):
         assignment_id = item.get("id")
         
@@ -79,7 +82,12 @@ def main():
             # library requests otomatis memformatnya menjadi multipart/form-data
             response = requests.post(url_base, headers=headers, files=multipart_data)
             
-            print(f" -> Status HTTP: {response.status_code}")
+            if response.status_code in (200, 201):
+                print(f" -> [SUKSES] Status HTTP: {response.status_code}")
+                total_success += 1
+            else:
+                print(f" -> [GAGAL] Status HTTP: {response.status_code}")
+                total_failed += 1
             
             try:
                 parsed_response = response.json()
@@ -91,8 +99,17 @@ def main():
             print("-" * 40)
             
         except requests.exceptions.RequestException as e:
-            print(f" -> [Error] Request gagal: {e}")
+            print(f" -> [ERROR] Request gagal: {e}")
+            total_failed += 1
             print("-" * 40)
+
+    print("\n" + "=" * 50)
+    print("           RINGKASAN AKHIR PENGEKSEKUSIAN")
+    print("=" * 50)
+    print(f" - Berhasil diproses : {total_success}")
+    print(f" - Gagal diproses    : {total_failed}")
+    print(f" - Total target      : {len(ids)}")
+    print("=" * 50)
 
 if __name__ == "__main__":
     main()

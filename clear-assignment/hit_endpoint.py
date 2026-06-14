@@ -303,6 +303,7 @@ def main():
     # Kirim request ke clear endpoint dalam batch
     batch_size = 100
     total_cleared = 0
+    total_failed = 0
     print(f"\n[*] Memulai pengiriman batch (batch size: {batch_size})...")
     
     for i in range(0, len(all_ids), batch_size):
@@ -315,21 +316,31 @@ def main():
                 headers=curl_clear['headers'],
                 json=batch
             )
-            print(f" -> Status HTTP: {response.status_code}")
+            
+            if response.status_code in (200, 201):
+                print(f" -> [SUKSES] Status HTTP: {response.status_code}")
+                total_cleared += len(batch)
+            else:
+                print(f" -> [GAGAL] Status HTTP: {response.status_code}")
+                total_failed += len(batch)
+                
             try:
                 res_json = response.json()
                 print(f" -> Response: {res_json}")
             except Exception:
                 print(f" -> Response Text: {response.text[:200]}")
                 
-            if response.status_code in (200, 201):
-                total_cleared += len(batch)
-            else:
-                print(f" -> [!] Gagal menghapus batch ini.")
         except Exception as e:
-            print(f" -> [!] Terjadi error saat mengirim batch: {e}")
+            print(f" -> [ERROR] Terjadi error saat mengirim batch: {e}")
+            total_failed += len(batch)
             
-    print(f"\n[*] Selesai! Berhasil menghapus {total_cleared} dari {len(all_ids)} assignment.")
+    print("\n" + "=" * 50)
+    print("           RINGKASAN AKHIR PENGEKSEKUSIAN")
+    print("=" * 50)
+    print(f" - Berhasil diproses : {total_cleared}")
+    print(f" - Gagal diproses    : {total_failed}")
+    print(f" - Total target      : {len(all_ids)}")
+    print("=" * 50)
 
 if __name__ == "__main__":
     main()
