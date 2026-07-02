@@ -18,6 +18,15 @@ FILE_CURL_ASSIGN = 'curl_assign.txt'
 
 # ================= FUNGSI BANTUAN =================
 
+def normalize_email(email):
+    if not email:
+        return ""
+    email_str = str(email).strip().lower()
+    email_str = re.sub(r'@bps\.goid$', '@bps.go.id', email_str)
+    email_str = re.sub(r'@bps\.goid\.id$', '@bps.go.id', email_str)
+    email_str = re.sub(r'@bps\.go$', '@bps.go.id', email_str)
+    return email_str
+
 def parse_curl(filepath):
     if not os.path.exists(filepath):
         print(f"❌ File {filepath} tidak ditemukan! Pastikan file sudah dibuat.")
@@ -31,10 +40,10 @@ def parse_curl(filepath):
     
     cookie_match = re.search(r"-b\s+['\"]([^'\"]+)['\"]", content)
     if not cookie_match:
-        cookie_match = re.search(r"[Cc]ookie:\s*([^'\"]+)", content)
+        cookie_match = re.search(r"Cookie:\s*([^'\"]+)", content, re.IGNORECASE)
     cookie = cookie_match.group(1) if cookie_match else ""
     
-    xsrf_match = re.search(r"X-XSRF-TOKEN:\s*([^'\"]+)", content)
+    xsrf_match = re.search(r"X-XSRF-TOKEN:\s*([^'\"]+)", content, re.IGNORECASE)
     xsrf = xsrf_match.group(1) if xsrf_match else ""
     
     return url, cookie, xsrf
@@ -58,28 +67,61 @@ def extract_list_from_json(json_data):
     return []
 
 def fetch_all_users(url, headers, role_name):
+    import urllib.parse
     print(f"Mengambil data {role_name}...")
     users_dict = {}
     page = 0
     page_size = 500
     
+    parsed_url = urllib.parse.urlparse(url)
+    query_params = urllib.parse.parse_qs(parsed_url.query)
+    
     while True:
-        payload = {"pageNumber": page, "pageSize": page_size, "sortBy": "ID", "sortDirection": "ASC", "keywordSearch": ""}
-        response = requests.post(url, headers=headers, json=payload)
+        query_params['page'] = [str(page)]
+        query_params['size'] = [str(page_size)]
+        
+        new_query = urllib.parse.urlencode(query_params, doseq=True)
+        new_url = urllib.parse.urlunparse((
+            parsed_url.scheme,
+            parsed_url.netloc,
+            parsed_url.path,
+            parsed_url.params,
+            new_query,
+            parsed_url.fragment
+        ))
+        
+        response = requests.get(new_url, headers=headers)
         if response.status_code != 200: break
         try: json_response = response.json()
         except requests.exceptions.JSONDecodeError: break
             
-        data = extract_list_from_json(json_response)
+        data = []
+        if isinstance(json_response, dict):
+            inner_data = json_response.get('data')
+            if isinstance(inner_data, dict):
+                data = inner_data.get('content') or []
+            elif isinstance(inner_data, list):
+                data = inner_data
+            else:
+                data = extract_list_from_json(json_response)
+        
         if not data or len(data) == 0: break
             
         for item in data:
             if not isinstance(item, dict): continue
-            email = None
-            if 'user' in item and isinstance(item['user'], dict):
+            email = item.get('email') or item.get('username')
+            if not email and 'user' in item and isinstance(item['user'], dict):
                 email = item['user'].get('email') or item['user'].get('username')
-            if not email: email = item.get('email')
-            if email: users_dict[str(email).strip().lower()] = item.get('id')
+                
+            if email:
+                allocation_id = item.get('allocationId') or item.get('id')
+                if not allocation_id:
+                    regions = item.get('regions')
+                    if isinstance(regions, list) and len(regions) > 0 and isinstance(regions[0], dict):
+                        allocation_id = regions[0].get('allocationId')
+                
+                if allocation_id:
+                    users_dict[str(email).strip().lower()] = allocation_id
                 
         if len(data) < page_size: break
         page += 1
@@ -244,8 +286,8 @@ def main():
         if sampel_excel.endswith('.0'):
             sampel_excel = sampel_excel[:-2]
             
-        email_pcl = str(row[KOLOM_PCL]).strip().lower()
-        email_pml = str(row[KOLOM_PML]).strip().lower()
+        email_pcl = normalize_email(row[KOLOM_PCL])
+        email_pml = normalize_email(row[KOLOM_PML])
         
         # Ambil nama perusahaan jika kolomnya tersedia
         nama_perusahaan = ""
@@ -318,6 +360,7 @@ def main():
             "level1Id": None, "level2Id": None, "level3Id": None, "level4Id": None, "level5Id": None,
             "level6Id": None, "level7Id": None, "level8Id": None, "level9Id": None, "level10Id": None,
             "surveyPeriodRoleUserIds": [pml_id, pcl_id],
+            "allocationIds": [pml_id, pcl_id],
             "assignmentIds": [sample_id],
             "replaceUser": True
         }
