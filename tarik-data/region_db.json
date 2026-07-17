@@ -1,0 +1,43 @@
+{
+  "31": {
+    "id": "6e930ee3-8185-4945-9155-cfd299355b11",
+    "fullCode": "31",
+    "name": "DKI JAKARTA",
+    "level": 1
+  },
+  "3175": {
+    "id": "77aa1bdd-0b88-46d9-b732-0d350b913804",
+    "fullCode": "3175",
+    "name": "JAKARTA UTARA",
+    "level": 2,
+    "parentCode": "31"
+  },
+  "3175010": {
+    "id": "cfc56774-dcc2-4cbe-866a-76f6f2e789a5",
+    "fullCode": "3175010",
+    "name": "PENJARINGAN",
+    "level": 3,
+    "parentCode": "3175"
+  },
+  "3175010001": {
+    "id": "25d25149-de00-47ab-8936-09f5d8301a8f",
+    "fullCode": "3175010001",
+    "name": "KAMAL MUARA",
+    "level": 4,
+    "parentCode": "3175010"
+  },
+  "31750100010001": {
+    "id": "6ba69b2d-2f28-4087-8d24-17017e07e15b",
+    "fullCode": "31750100010001",
+    "name": "RT 001 RW 001",
+    "level": 5,
+    "parentCode": "3175010001"
+  },
+  "3175010001000100": {
+    "id": "53e275d6-bf4f-4c0d-ad26-1366b127251d",
+    "fullCode": "3175010001000100",
+    "name": "RT 001 RW 001",
+    "level": 6,
+    "parentCode": "31750100010001"
+  }
+}

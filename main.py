@@ -24,6 +24,11 @@ MODULES = {
         "name": "assign",
         "title": "Assign (Auto Allocation)",
         "desc": "Mengotomatiskan assignment Pencacah/Pengawas ke sampel berdasarkan assign.xlsx."
+    },
+    "5": {
+        "name": "tarik-data",
+        "title": "Tarik Data (Ekstraksi Data per Sub SLS)",
+        "desc": "Menarik data penugasan berdasarkan daftar kode Sub SLS dari database wilayah."
     }
 }
 
@@ -59,6 +64,13 @@ HELP_STEPS = {
         "4. cURL Sampel: Klik/filter tabel sampel. Cari request bernama 'datatable?...' -> Klik Kanan -> Copy as cURL (bash) -> Paste ke: assign/curl_sampel.txt",
         "5. cURL Assign: Uji coba assign manual 1x di web. Cari request 'assign-by-selection/...' -> Copy as cURL (bash) -> Paste ke: assign/curl_assign.txt",
         "6. Excel: Siapkan berkas Excel di assign/assign.xlsx dengan kolom header: idsbr, email_pencacah, email_pengawas, perusahaan."
+    ],
+    "tarik-data": [
+        "1. Login ke website FASIH BPS di browser Anda dan tekan F12 untuk membuka Developer Tools -> tab 'Network'.",
+        "2. cURL Datatable: Buka halaman datatable, cari request 'datatable-all-user-survey-periode' -> Copy as cURL (bash) -> Paste ke: tarik-data/curl.txt",
+        "3. cURL Region: Klik dropdown wilayah (misal Provinsi), cari request '/region/level' -> Copy as cURL (bash) -> Paste ke: tarik-data/curl_region.txt",
+        "4. Tunggu proses pembangunan database wilayah selesai (level 1-6: Provinsi s.d. Sub SLS).",
+        "5. Siapkan daftar kode fullCode sub SLS target di file Excel: tarik-data/subsls_target.xlsx (kolom pertama berisi kode sub SLS)."
     ]
 }
 
@@ -86,7 +98,7 @@ def show_help(target_name=None):
                 print(f" {key}. {info['title']}")
             print(" q. Kembali ke menu utama")
             print("-" * 60)
-            choice = input("Masukkan pilihan bantuan (1/2/3/4/q): ").strip().lower()
+            choice = input("Masukkan pilihan bantuan (1/2/3/4/5/q): ").strip().lower()
             if choice == 'q':
                 break
             elif choice in MODULES:
@@ -140,7 +152,7 @@ def show_menu():
     print(" q. Keluar")
     print("-" * 60)
     
-    choice = input("Masukkan pilihan Anda (1/2/3/4/h/q): ").strip().lower()
+    choice = input("Masukkan pilihan Anda (1/2/3/4/5/h/q): ").strip().lower()
     if choice == 'q':
         print("[*] Selesai.")
         sys.exit(0)
