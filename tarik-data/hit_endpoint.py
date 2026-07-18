@@ -819,14 +819,28 @@ def main():
         try:
             df_result = pd.json_normalize(all_results)
             
-            # Saring kolom agar hanya menyimpan kolom datatable dan Sub SLS
-            target_cols = [
-                '_subsls_code', '_subsls_name', 'id', 'codeIdentity',
-                'data1', 'data2', 'data3', 'data4', 'data5',
-                'data6', 'data7', 'data8', 'data9', 'data10'
-            ]
-            existing_cols = [col for col in target_cols if col in df_result.columns]
-            df_filtered = df_result[existing_cols]
+            # Kolom yang diinginkan dan pemetaannya ke header manusiawi
+            column_mapping = {
+                '_subsls_code': 'Kode Sub SLS',
+                '_subsls_name': 'Nama Sub SLS',
+                'id': 'ID',
+                'codeIdentity': 'Kode Identitas',
+                'data1': 'Nama Keluarga/Bangunan/Usaha',
+                'data2': 'Alamat Prelist',
+                'data3': 'Nomor Urut Bangunan / IDSBR',
+                'data4': 'NIB',
+                'data5': 'Email',
+                'data6': 'Skala Usaha / Jenis Prelist',
+                'data7': 'Jumlah Usaha',
+                'data8': 'Kode Pos',
+                'data9': 'Perubahan SLS',
+                'data10': 'IDSBR UMKM SLS Sama',
+                'assignmentStatusAlias': 'Status Assignment',
+                'assignmentErrorStatusType': 'Status Pencacahan'
+            }
+            
+            existing_cols = [col for col in column_mapping.keys() if col in df_result.columns]
+            df_filtered = df_result[existing_cols].rename(columns=column_mapping)
             
             df_filtered.to_excel(RESULT_FILE, index=False, engine='openpyxl')
             print(f"\n[*] Data berhasil disimpan ke '{RESULT_FILE}' ({len(all_results)} record total).")
