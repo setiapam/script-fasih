@@ -10,3 +10,9 @@ __pycache__/
 
 # Log Files
 *.log
+
+# Data Extraction Results & Temp Progress
+tarik-data/result.xlsx
+tarik-data/result_temp.json
+tarik-data/temp_records/
+

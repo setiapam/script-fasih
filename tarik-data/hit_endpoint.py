@@ -6,6 +6,8 @@ import os
 import copy
 import time
 import pandas as pd
+import shutil
+import re
 
 # ============================================================
 #  KONFIGURASI
@@ -120,6 +122,10 @@ def fetch_region_level(headers, level, group_id, parent_code=None):
     try:
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
+            content_type = response.headers.get('Content-Type', '')
+            if 'text/html' in content_type or response.text.strip().startswith('<'):
+                print(f"   [GAGAL] Sesi cURL kedaluwarsa (Session Expired / Redirect ke Login) saat mengambil level{level}")
+                return []
             data = response.json()
             # API bisa mengembalikan list langsung atau dict dengan key 'data'
             if isinstance(data, list):
@@ -156,14 +162,14 @@ def extract_parent_codes(subsls_code):
     }
 
 
-def build_region_database(headers, group_id, target_subsls_codes):
+def build_region_database(headers, group_id, target_subsls_codes, existing_db=None):
     """
     Membangun database wilayah HANYA untuk wilayah yang bersesuaian
     dengan daftar kode sub SLS yang ditargetkan.
 
     Returns: dict dengan key = fullCode, value = region info dict
     """
-    region_db = {}
+    region_db = copy.deepcopy(existing_db) if existing_db is not None else {}
 
     # Kumpulkan semua parent codes unik per level dari target
     needed = {1: set(), 2: set(), 3: set(), 4: set(), 5: set(), 6: set()}
@@ -195,6 +201,14 @@ def build_region_database(headers, group_id, target_subsls_codes):
             }
             found += 1
     print(f"    Ditemukan {found}/{len(prov_codes_needed)} provinsi.")
+    
+    # Simpan level 1 ke cache file
+    try:
+        with open(REGION_DB_FILE, 'w', encoding='utf-8') as f:
+            json.dump(region_db, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"    [!] Gagal menyimpan cache provinsi: {e}")
+        
     time.sleep(REQUEST_DELAY)
 
     # === LEVEL 2-6: Ambil per parent yang dibutuhkan saja ===
@@ -216,9 +230,14 @@ def build_region_database(headers, group_id, target_subsls_codes):
             if parent_code in region_db:
                 parent_codes_to_query.add(parent_code)
 
-        print(f"[*] Mengambil data Level {level} ({label}) - {len(codes_needed)} target dari {len(parent_codes_to_query)} parent...")
+        total_parents = len(parent_codes_to_query)
+        print(f"[*] Mengambil data Level {level} ({label}) - {len(codes_needed)} target dari {total_parents} parent...")
+        
         found = 0
-        for parent_code in sorted(parent_codes_to_query):
+        for parent_idx, parent_code in enumerate(sorted(parent_codes_to_query)):
+            # Tampilkan progress bar sederhana di terminal
+            print(f"\r    [{label}] Progres: {parent_idx + 1}/{total_parents} parent...", end="", flush=True)
+            
             children = fetch_region_level(headers, level, group_id, parent_code)
             for child in children:
                 child_code = child.get('fullCode', '')
@@ -231,8 +250,17 @@ def build_region_database(headers, group_id, target_subsls_codes):
                         "parentCode": parent_code
                     }
                     found += 1
+            
+            # Simpan progress ke cache file secara incremental
+            try:
+                with open(REGION_DB_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(region_db, f, indent=2, ensure_ascii=False)
+            except Exception as e:
+                pass
+                
             time.sleep(REQUEST_DELAY)
-        print(f"    Ditemukan {found}/{len(codes_needed)} {label.lower()}.")
+            
+        print(f"\n    Ditemukan {found}/{len(codes_needed)} {label.lower()}.")
 
     return region_db
 
@@ -294,6 +322,10 @@ def fetch_data_for_subsls(headers, base_payload, region_ids):
             if response.status_code != 200:
                 return None, f"HTTP {response.status_code}"
 
+            content_type = response.headers.get('Content-Type', '')
+            if 'text/html' in content_type or response.text.strip().startswith('<'):
+                return None, "Sesi cURL kedaluwarsa (Session Expired / Redirect ke Login)"
+
             res_json = response.json()
             data_list = res_json.get('data') or res_json.get('searchData') or []
 
@@ -312,6 +344,97 @@ def fetch_data_for_subsls(headers, base_payload, region_ids):
             return None, f"RequestException: {e}"
 
     return all_records, None
+
+
+def migrate_old_checkpoint(filepath, temp_dir):
+    """
+    Memulihkan data dari file checkpoint 'result_temp.json' yang rusak (korup) akibat Ctrl+C
+    dan memindahkannya ke struktur folder progres baru 'temp_records'.
+    """
+    if not os.path.exists(filepath):
+        return False
+        
+    print(f"\n[*] Mendeteksi file checkpoint lama '{filepath}'.")
+    print(f"[*] Mencoba memulihkan data dari berkas yang korup/terputus...")
+    
+    try:
+        completed_subsls = []
+        records = []
+        
+        with open(filepath, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        in_completed = False
+        completed_block = []
+        for line in lines:
+            if '"completed_subsls":' in line:
+                in_completed = True
+                continue
+            if in_completed:
+                completed_block.append(line)
+                if ']' in line:
+                    in_completed = False
+                    break
+        
+        if completed_block:
+            completed_subsls = re.findall(r'"(\d+)"', "".join(completed_block))
+            
+        content = "".join(lines)
+        start_idx = content.find('"records": [')
+        if start_idx != -1:
+            records_content = content[start_idx + 12:]
+            brace_count = 0
+            obj_chars = []
+            in_object = False
+            for char in records_content:
+                if char == '{':
+                    if brace_count == 0:
+                        in_object = True
+                    brace_count += 1
+                if in_object:
+                    obj_chars.append(char)
+                if char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        in_object = False
+                        try:
+                            obj = json.loads("".join(obj_chars))
+                            records.append(obj)
+                        except:
+                            pass
+                        obj_chars = []
+                        
+        if completed_subsls:
+            # Buat folder temp_dir jika belum ada
+            os.makedirs(temp_dir, exist_ok=True)
+            
+            # Kelompokkan records berdasarkan _subsls_code
+            grouped = {}
+            for rec in records:
+                code = rec.get('_subsls_code')
+                if code:
+                    grouped.setdefault(code, []).append(rec)
+            
+            # Tulis ke file kecil-kecil
+            for code in completed_subsls:
+                subsls_records = grouped.get(code, [])
+                subsls_file = os.path.join(temp_dir, f"{code}.json")
+                with open(subsls_file, "w", encoding="utf-8") as sf:
+                    json.dump(subsls_records, sf, indent=2, ensure_ascii=False)
+            
+            print(f"[*] Migrasi berhasil! {len(completed_subsls)} wilayah dan {len(records)} record berhasil dipulihkan.")
+            # Hapus file lama yang korup
+            try:
+                os.remove(filepath)
+                print(f"[*] File checkpoint lama '{filepath}' telah dihapus karena migrasi selesai.")
+            except Exception as ex:
+                print(f"[!] Gagal menghapus '{filepath}': {ex}")
+            return True
+            
+    except Exception as e:
+        print(f"[!] Gagal memigrasikan data lama: {e}")
+        
+    return False
 
 
 # ============================================================
@@ -490,11 +613,7 @@ def main():
         if missing:
             print(f"    {len(missing)} dari {len(target_subsls_codes)} target belum ada di database.")
             print(f"    Melengkapi data wilayah yang kurang...")
-            new_db = build_region_database(headers, group_id, missing)
-            region_db.update(new_db)
-            # Simpan ulang
-            with open(REGION_DB_FILE, 'w', encoding='utf-8') as f:
-                json.dump(region_db, f, indent=2, ensure_ascii=False)
+            region_db = build_region_database(headers, group_id, missing, existing_db=region_db)
             print(f"    Database wilayah diperbarui.")
         else:
             print(f"    Semua {len(target_subsls_codes)} target sudah ada di database.")
@@ -533,97 +652,188 @@ def main():
         print("[!] Tidak ada target sub SLS yang valid!")
         return
 
-    print(f"\n[*] Target valid: {len(valid_targets)} sub SLS.")
-    confirm = input(f"[?] Mulai mengambil data untuk {len(valid_targets)} sub SLS? (Y/n): ").strip().lower()
-    if confirm == 'n':
-        print("[*] Dibatalkan oleh pengguna.")
-        return
+    # Checkpoint progress logic
+    TEMP_DIR = "temp_records"
+    TEMP_RESULT_FILE = "result_temp.json"
 
-    # --- LANGKAH 4: Eksekusi pengambilan data ---
-    timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(LOG_FILE, "a", encoding="utf-8") as lf:
-        lf.write(f"\n{'='*50}\n")
-        lf.write(f"EKSEKUSI TARIK DATA: {timestamp_str}\n")
-        lf.write(f"{'='*50}\n")
+    # 1. Migrasi dari checkpoint format lama (jika ada)
+    migrate_old_checkpoint(TEMP_RESULT_FILE, TEMP_DIR)
 
-    print(f"\n[*] Memulai pengambilan data...\n")
-    print("-" * 60)
+    # 2. Baca progress yang ada dari folder temp_records
+    completed_subsls = []
+    if os.path.exists(TEMP_DIR):
+        completed_subsls = [f[:-5] for f in os.listdir(TEMP_DIR) if f.endswith(".json")]
 
-    all_results = []
-    total_success = 0
+    if completed_subsls:
+        # Hitung jumlah records yang sudah terkumpul sejauh ini
+        records_count = 0
+        for code in completed_subsls:
+            filepath = os.path.join(TEMP_DIR, f"{code}.json")
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    records_count += len(data)
+            except:
+                pass
+                
+        print(f"\n[*] Ditemukan progress sementara di folder '{TEMP_DIR}':")
+        print(f"    - Wilayah selesai: {len(completed_subsls)}")
+        print(f"    - Record terkumpul: {records_count}")
+        
+        resume = input("[?] Lanjutkan progress sebelumnya? (Y/n): ").strip().lower()
+        if resume == 'n':
+            print(f"[*] Memulai ulang dari awal (menghapus folder '{TEMP_DIR}').")
+            if os.path.exists(TEMP_DIR):
+                shutil.rmtree(TEMP_DIR)
+            completed_subsls = []
+
+    completed_set = set(completed_subsls)
+    remaining_targets = [(code, r_ids) for code, r_ids in valid_targets if code not in completed_set]
+
+    # Hitung sukses dan gagal awal
+    total_success = len(completed_set)
     total_failed = 0
     total_records = 0
+    # Hitung total_records dari file-file di temp_records yang valid
+    if completed_set:
+        for code in completed_set:
+            filepath = os.path.join(TEMP_DIR, f"{code}.json")
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    total_records += len(json.load(f))
+            except:
+                pass
     failed_details = []
 
-    for idx, (subsls_code, region_ids) in enumerate(valid_targets):
-        subsls_info = region_db.get(subsls_code, {})
-        subsls_name = subsls_info.get('name', 'N/A')
+    if not remaining_targets:
+        print(f"\n[*] Semua {len(valid_targets)} target sub SLS sudah selesai diambil.")
+    else:
+        print(f"\n[*] Target valid: {len(valid_targets)} sub SLS.")
+        print(f"[*] Target tersisa untuk diambil: {len(remaining_targets)} sub SLS.")
+        confirm = input(f"[?] Mulai mengambil data untuk {len(remaining_targets)} sub SLS? (Y/n): ").strip().lower()
+        if confirm == 'n':
+            print("[*] Dibatalkan oleh pengguna.")
+            return
 
-        log_msg = f"[{idx+1}/{len(valid_targets)}] Sub SLS: {subsls_code} ({subsls_name})"
-        print(log_msg)
+        # --- LANGKAH 4: Eksekusi pengambilan data ---
+        timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(LOG_FILE, "a", encoding="utf-8") as lf:
-            lf.write(log_msg + "\n")
+            lf.write(f"\n{'='*50}\n")
+            lf.write(f"EKSEKUSI TARIK DATA: {timestamp_str}\n")
+            lf.write(f"{'='*50}\n")
 
-        try:
-            records, error = fetch_data_for_subsls(headers, base_payload, region_ids)
+        print(f"\n[*] Memulai pengambilan data...\n")
+        print("-" * 60)
 
-            if error:
-                msg = f" -> [GAGAL] {error}"
+        completed_offset = len(completed_set)
+
+        for idx, (subsls_code, region_ids) in enumerate(remaining_targets):
+            subsls_info = region_db.get(subsls_code, {})
+            subsls_name = subsls_info.get('name', 'N/A')
+
+            log_msg = f"[{completed_offset + idx + 1}/{len(valid_targets)}] Sub SLS: {subsls_code} ({subsls_name})"
+            print(log_msg)
+            with open(LOG_FILE, "a", encoding="utf-8") as lf:
+                lf.write(log_msg + "\n")
+
+            try:
+                records, error = fetch_data_for_subsls(headers, base_payload, region_ids)
+
+                if error:
+                    msg = f" -> [GAGAL] {error}"
+                    print(msg)
+                    total_failed += 1
+                    failed_details.append({
+                        "subsls_code": subsls_code,
+                        "subsls_name": subsls_name,
+                        "reason": error
+                    })
+                    with open(LOG_FILE, "a", encoding="utf-8") as lf:
+                        lf.write(msg + "\n")
+                elif records is not None:
+                    record_count = len(records)
+                    msg = f" -> [SUKSES] {record_count} record ditemukan."
+                    print(msg)
+                    total_success += 1
+                    total_records += record_count
+
+                    # Tambahkan metadata wilayah ke setiap record
+                    for record in records:
+                        if isinstance(record, dict):
+                            record['_subsls_code'] = subsls_code
+                            record['_subsls_name'] = subsls_name
+
+                    # Simpan hasil untuk subsls ini saja ke berkas terpisah
+                    os.makedirs(TEMP_DIR, exist_ok=True)
+                    subsls_file = os.path.join(TEMP_DIR, f"{subsls_code}.json")
+                    with open(subsls_file, "w", encoding="utf-8") as f:
+                        json.dump(records, f, indent=2, ensure_ascii=False)
+
+                    with open(LOG_FILE, "a", encoding="utf-8") as lf:
+                        lf.write(msg + "\n")
+                else:
+                    msg = " -> [SUKSES] 0 record (kosong)."
+                    print(msg)
+                    total_success += 1
+                    
+                    # Simpan list kosong untuk menandai ini selesai
+                    os.makedirs(TEMP_DIR, exist_ok=True)
+                    subsls_file = os.path.join(TEMP_DIR, f"{subsls_code}.json")
+                    with open(subsls_file, "w", encoding="utf-8") as f:
+                        json.dump([], f, indent=2, ensure_ascii=False)
+                        
+                    with open(LOG_FILE, "a", encoding="utf-8") as lf:
+                        lf.write(msg + "\n")
+
+            except Exception as e:
+                msg = f" -> [ERROR] {e}"
                 print(msg)
                 total_failed += 1
                 failed_details.append({
                     "subsls_code": subsls_code,
                     "subsls_name": subsls_name,
-                    "reason": error
+                    "reason": f"Exception: {e}"
                 })
                 with open(LOG_FILE, "a", encoding="utf-8") as lf:
                     lf.write(msg + "\n")
-            elif records is not None:
-                record_count = len(records)
-                msg = f" -> [SUKSES] {record_count} record ditemukan."
-                print(msg)
-                total_success += 1
-                total_records += record_count
 
-                # Tambahkan metadata wilayah ke setiap record
-                for record in records:
-                    if isinstance(record, dict):
-                        record['_subsls_code'] = subsls_code
-                        record['_subsls_name'] = subsls_name
+            print("-" * 60)
+            time.sleep(REQUEST_DELAY)
 
-                all_results.extend(records)
-
-                with open(LOG_FILE, "a", encoding="utf-8") as lf:
-                    lf.write(msg + "\n")
-            else:
-                msg = " -> [SUKSES] 0 record (kosong)."
-                print(msg)
-                total_success += 1
-                with open(LOG_FILE, "a", encoding="utf-8") as lf:
-                    lf.write(msg + "\n")
-
-        except Exception as e:
-            msg = f" -> [ERROR] {e}"
-            print(msg)
-            total_failed += 1
-            failed_details.append({
-                "subsls_code": subsls_code,
-                "subsls_name": subsls_name,
-                "reason": f"Exception: {e}"
-            })
-            with open(LOG_FILE, "a", encoding="utf-8") as lf:
-                lf.write(msg + "\n")
-
-        print("-" * 60)
-        time.sleep(REQUEST_DELAY)
+    # Gabungkan semua data dari temp_records untuk disimpan ke Excel
+    all_results = []
+    if os.path.exists(TEMP_DIR):
+        print("\n[*] Menggabungkan semua data progres sementara...")
+        for filename in sorted(os.listdir(TEMP_DIR)):
+            if filename.endswith(".json"):
+                filepath = os.path.join(TEMP_DIR, filename)
+                try:
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        all_results.extend(data)
+                except Exception as e:
+                    print(f"[!] Gagal membaca file progress '{filename}': {e}")
 
     # Simpan hasil ke Excel
     if all_results:
-        df_result = pd.json_normalize(all_results)
-        df_result.to_excel(RESULT_FILE, index=False, engine='openpyxl')
-        print(f"\n[*] Data berhasil disimpan ke '{RESULT_FILE}' ({len(all_results)} record total).")
-        print(f"    Jumlah kolom: {len(df_result.columns)}")
-        print(f"    Kolom: {', '.join(df_result.columns[:10])}{'...' if len(df_result.columns) > 10 else ''}")
+        try:
+            df_result = pd.json_normalize(all_results)
+            df_result.to_excel(RESULT_FILE, index=False, engine='openpyxl')
+            print(f"\n[*] Data berhasil disimpan ke '{RESULT_FILE}' ({len(all_results)} record total).")
+            print(f"    Jumlah kolom: {len(df_result.columns)}")
+            print(f"    Kolom: {', '.join(df_result.columns[:10])}{'...' if len(df_result.columns) > 10 else ''}")
+            
+            # Hapus folder temp_records hanya jika semua target sukses (tidak ada kegagalan)
+            if total_failed == 0:
+                if os.path.exists(TEMP_DIR):
+                    shutil.rmtree(TEMP_DIR)
+                    print(f"[*] Menghapus folder progres sementara '{TEMP_DIR}'.")
+            else:
+                print(f"\n[!] Perhatian: Terdapat {total_failed} wilayah yang gagal ditarik (misal karena sesi habis).")
+                print(f"[!] Folder progres sementara '{TEMP_DIR}' tetap dipertahankan agar Anda dapat melanjutkan kembali penarikan data.")
+        except Exception as e:
+            print(f"[!] Gagal menulis ke '{RESULT_FILE}': {e}")
+            print(f"[!] Data Anda tetap aman tersimpan di folder progres sementara '{TEMP_DIR}'.")
 
     # Ringkasan akhir
     summary_lines = []
