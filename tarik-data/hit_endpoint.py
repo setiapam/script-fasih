@@ -818,10 +818,20 @@ def main():
     if all_results:
         try:
             df_result = pd.json_normalize(all_results)
-            df_result.to_excel(RESULT_FILE, index=False, engine='openpyxl')
+            
+            # Saring kolom agar hanya menyimpan kolom datatable dan Sub SLS
+            target_cols = [
+                '_subsls_code', '_subsls_name', 'id', 'codeIdentity',
+                'data1', 'data2', 'data3', 'data4', 'data5',
+                'data6', 'data7', 'data8', 'data9', 'data10'
+            ]
+            existing_cols = [col for col in target_cols if col in df_result.columns]
+            df_filtered = df_result[existing_cols]
+            
+            df_filtered.to_excel(RESULT_FILE, index=False, engine='openpyxl')
             print(f"\n[*] Data berhasil disimpan ke '{RESULT_FILE}' ({len(all_results)} record total).")
-            print(f"    Jumlah kolom: {len(df_result.columns)}")
-            print(f"    Kolom: {', '.join(df_result.columns[:10])}{'...' if len(df_result.columns) > 10 else ''}")
+            print(f"    Jumlah kolom: {len(df_filtered.columns)}")
+            print(f"    Kolom: {', '.join(df_filtered.columns)}")
             
             # Hapus folder temp_records hanya jika semua target sukses (tidak ada kegagalan)
             if total_failed == 0:
