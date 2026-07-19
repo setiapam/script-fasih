@@ -14,6 +14,7 @@ import re
 # ============================================================
 BASE_URL = "https://fasih-sm.bps.go.id/app/api/region/api/v1/region"
 DATA_URL = "https://fasih-sm.bps.go.id/app/api/analytic/api/v2/assignment/datatable-all-user-survey-periode"
+APPROVAL_URL = "https://fasih-sm.bps.go.id/app/api/assignment-general/api/assignment-responsibility/get-structure-approval"
 REGION_DB_FILE = "region_db.json"
 RESULT_FILE = "result.xlsx"
 TARGET_FILE = "subsls_target.xlsx"
@@ -437,6 +438,40 @@ def migrate_old_checkpoint(filepath, temp_dir):
     return False
 
 
+def extract_responsibility_uids(record):
+    pencacah_uid = None
+    pengawas_uid = None
+    responsibilities = record.get('assignmentResponsibility', [])
+    if isinstance(responsibilities, list):
+        for resp in responsibilities:
+            if not isinstance(resp, dict):
+                continue
+            role_name = resp.get('currentSurveyRoleName', '')
+            is_pencacah = resp.get('currentSurveyRoleIsPencacah', False)
+            uid = resp.get('currentUserId')
+            if role_name == 'Pencacah' or is_pencacah:
+                pencacah_uid = uid
+            elif role_name == 'Pengawas':
+                pengawas_uid = uid
+    return pencacah_uid, pengawas_uid
+
+
+def fetch_approval_structure(headers, assignment_id):
+    params = {"assignmentId": assignment_id}
+    try:
+        response = requests.get(APPROVAL_URL, headers=headers, params=params)
+        if response.status_code == 200:
+            content_type = response.headers.get('Content-Type', '')
+            if 'text/html' in content_type or response.text.strip().startswith('<'):
+                return None, "Sesi expired"
+            data = response.json()
+            if isinstance(data, dict) and data.get('success'):
+                return data.get('data', []), None
+        return None, f"HTTP {response.status_code}"
+    except Exception as e:
+        return None, str(e)
+
+
 # ============================================================
 #  MAIN ENTRY POINT
 # ============================================================
@@ -694,6 +729,7 @@ def main():
     total_success = len(completed_set)
     total_failed = 0
     total_records = 0
+    approval_cache = {}
     # Hitung total_records dari file-file di temp_records yang valid
     if completed_set:
         for code in completed_set:
@@ -757,11 +793,48 @@ def main():
                     total_success += 1
                     total_records += record_count
 
-                    # Tambahkan metadata wilayah ke setiap record
+                    # Tambahkan metadata wilayah, Pencacah, dan Pengawas ke setiap record
                     for record in records:
                         if isinstance(record, dict):
                             record['_subsls_code'] = subsls_code
                             record['_subsls_name'] = subsls_name
+                            
+                            p_uid, w_uid = extract_responsibility_uids(record)
+                            cache_key = (p_uid, w_uid)
+                            
+                            if cache_key not in approval_cache:
+                                assignment_id = record.get('id')
+                                if assignment_id:
+                                    approval_data, err = fetch_approval_structure(headers, assignment_id)
+                                    if not err and approval_data:
+                                        p_name, p_email, w_name, w_email = None, None, None, None
+                                        for user in approval_data:
+                                            role = user.get('currentSurveyRoleName', '')
+                                            email = user.get('email', '')
+                                            fullname = user.get('fullname', '')
+                                            name = fullname if fullname and fullname != 'null' else email.split('@')[0]
+                                            
+                                            if role == 'Pencacah':
+                                                p_name = name
+                                                p_email = email
+                                            elif role == 'Pengawas':
+                                                w_name = name
+                                                w_email = email
+                                                
+                                        approval_cache[cache_key] = (p_name, p_email, w_name, w_email)
+                                        time.sleep(REQUEST_DELAY)
+                                    
+                            if cache_key in approval_cache:
+                                p_name, p_email, w_name, w_email = approval_cache[cache_key]
+                                record['_pencacah_name'] = p_name
+                                record['_pencacah_email'] = p_email
+                                record['_pengawas_name'] = w_name
+                                record['_pengawas_email'] = w_email
+                            else:
+                                record['_pencacah_name'] = None
+                                record['_pencacah_email'] = None
+                                record['_pengawas_name'] = None
+                                record['_pengawas_email'] = None
 
                     # Simpan hasil untuk subsls ini saja ke berkas terpisah
                     os.makedirs(TEMP_DIR, exist_ok=True)
@@ -835,6 +908,10 @@ def main():
                 'data8': 'Kode Pos',
                 'data9': 'Perubahan SLS',
                 'data10': 'IDSBR UMKM SLS Sama',
+                '_pencacah_name': 'Pencacah',
+                '_pencacah_email': 'Email Pencacah',
+                '_pengawas_name': 'Pengawas',
+                '_pengawas_email': 'Email Pengawas',
                 'assignmentStatusAlias': 'Status Assignment',
                 'assignmentErrorStatusType': 'Status Pencacahan'
             }
