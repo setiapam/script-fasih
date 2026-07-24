@@ -180,44 +180,55 @@ def fetch_all_samples(url, headers, survey_period_id):
 
 def fetch_single_sample_on_demand(url, headers, survey_period_id, keyword, target_idsbr):
     """Mencari 1 sampel secara spesifik ke server dan memverifikasi dengan IDSBR"""
-    # Bersihkan keyword agar pencarian lebih akurat (hilangkan kutip dsb jika perlu)
     search_term = str(keyword).strip()
     
     payload = {
-        "draw": 999,
-        "columns": [
-            {"data": "id", "searchable": True, "orderable": False, "search": {"value": "", "regex": False}},
-            {"data": "codeIdentity", "searchable": True, "orderable": False, "search": {"value": "", "regex": False}},
-            {"data": "data1", "searchable": True, "orderable": True, "search": {"value": "", "regex": False}},
-            {"data": "data2", "searchable": True, "orderable": True, "search": {"value": "", "regex": False}},
-            {"data": "data3", "searchable": True, "orderable": True, "search": {"value": "", "regex": False}},
-            {"data": "data4", "searchable": True, "orderable": True, "search": {"value": "", "regex": False}}
-        ],
-        "order": [{"column": 0, "dir": "asc"}],
         "start": 0,
-        "length": 100,  # Ambil hingga 100 hasil mirip, lalu cari mana yang idsbr-nya cocok
+        "length": 100,
+        "columns": [
+            {"data": "id", "orderable": True},
+            {"data": "codeIdentity", "orderable": True},
+            {"data": "data1", "orderable": True},
+            {"data": "data2", "orderable": True},
+            {"data": "data3", "orderable": True},
+            {"data": "data4", "orderable": True},
+            {"data": "data5", "orderable": True},
+            {"data": "data6", "orderable": True},
+            {"data": "data7", "orderable": True},
+            {"data": "data8", "orderable": True},
+            {"data": "data9", "orderable": True},
+            {"data": "data10", "orderable": True}
+        ],
+        "order": [],
         "search": {"value": search_term, "regex": False},
         "assignmentExtraParam": {"surveyPeriodId": survey_period_id, "filterTargetType": "TARGET_ONLY", "assignmentErrorStatusType": -1}
     }
     
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        if response.status_code == 200:
-            data = extract_list_from_json(response.json())
-            for item in data:
-                if not isinstance(item, dict): continue
-                
-                # Double-Check: Apakah di antara baris hasil pencarian ini ada IDSBR target kita?
-                for key in ['codeIdentity', 'data1', 'data2', 'data3', 'data4', 'data5']:
-                    val = str(item.get(key, '')).strip()
-                    if val.endswith('.0'): val = val[:-2]
+    for attempt in range(3):
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            if response.status_code == 200:
+                data = extract_list_from_json(response.json())
+                for item in data:
+                    if not isinstance(item, dict): continue
                     
-                    if val == str(target_idsbr):
-                        return item.get('id')
-    except Exception:
-        pass
+                    # Double-Check: Apakah di antara baris hasil pencarian ini ada IDSBR target kita?
+                    for key in ['codeIdentity', 'data1', 'data2', 'data3', 'data4', 'data5']:
+                        val = str(item.get(key, '')).strip()
+                        if val.endswith('.0'): val = val[:-2]
+                        
+                        if val == str(target_idsbr) or str(target_idsbr) in str(item.get('codeIdentity', '')):
+                            return item.get('id')
+                break
+            elif response.status_code == 429:
+                time.sleep(2.0 * (attempt + 1))
+            else:
+                break
+        except Exception:
+            time.sleep(1.0)
         
     return None
+
 
 def save_dict_to_csv(data_dict, filename, col1_name, col2_name):
     if data_dict:
@@ -389,7 +400,7 @@ def main():
             with open(log_file, "a", encoding="utf-8") as lf:
                 lf.write(msg + "\n")
             
-        time.sleep(0.1) 
+        time.sleep(0.4) 
 
     summary_lines = []
     summary_lines.append("\n" + "=" * 50)
