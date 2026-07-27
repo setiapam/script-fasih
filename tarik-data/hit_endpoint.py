@@ -321,6 +321,8 @@ def fetch_data_for_subsls(headers, base_payload, region_ids):
         try:
             response = requests.post(DATA_URL, headers=headers, json=payload)
             if response.status_code != 200:
+                if response.status_code == 405:
+                    return None, "HTTP 405 (Sesi cURL Kedaluwarsa / Method Not Allowed - Silakan perbarui tarik-data/curl.txt)"
                 return None, f"HTTP {response.status_code}"
 
             content_type = response.headers.get('Content-Type', '')
