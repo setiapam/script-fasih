@@ -6,10 +6,12 @@ Modul ini digunakan untuk mengotomatiskan proses *assignment* (penugasan) Pencac
 
 ## 📋 Alur Kerja (Workflow)
 
-1. **Membaca cURL & Excel**: Script membaca konfigurasi cURL (headers/cookies) dari file teks pendukung dan memuat data penugasan dari berkas Excel `assign.xlsx`.
-2. **Penarikan Cache Data**: Script mengunduh daftar Pencacah, Pengawas, dan 1000 data sampel kegiatan pertama dari server untuk disimpan dalam memori (*caching*).
-3. **Pencarian Spesifik (On-Demand)**: Jika ada ID sampel di Excel yang posisinya di atas urutan 1000 (tidak ada di memori cache), script akan memicu pencarian spesifik menggunakan nama perusahaan atau ID sampel ke API server.
-4. **Auto-Assign**: Script memasangkan PCL dan PML ke sampel yang ditemukan menggunakan request POST.
+1. **Membaca cURL & Excel**: Script membaca konfigurasi cURL (headers/cookies/period ID) dari 1 berkas `curl.txt` dan memuat data penugasan dari berkas Excel `assign.xlsx`.
+2. **Penarikan Cache Data**: Script mengunduh daftar Pencacah, Pengawas, dan sampel kegiatan dari server BPS ke memori (*caching*).
+3. **Pencarian Spesifik (On-Demand)**:
+   - **Sampel**: Jika ID sampel di Excel tidak ada di memori cache, script memicu pencarian spesifik ke server dengan mengutamakan **angka IDSBR terlebih dahulu**, baru menggunakan nama perusahaan sebagai *fallback*.
+   - **Petugas**: Jika email PCL/PML belum ada di memori, script secara otomatis mencari petugas langsung ke API server BPS.
+4. **Auto-Assign & Checkpoint**: Script memasangkan PCL dan PML ke sampel menggunakan request POST, mencatat progress yang berhasil ke `completed_assign.json`, dan memperbarui laporan CSV (`laporan_hasil_assign.csv`) secara *upsert*.
 
 ---
 
@@ -27,12 +29,11 @@ Modul ini digunakan untuk mengotomatiskan proses *assignment* (penugasan) Pencac
 
 * **[hit_endpoint.py](hit_endpoint.py)**: Kode utama script otomatisasi Python.
 * **[__init__.py](__init__.py)**: Inisialisasi modul untuk runner utama.
-* **[requirements.txt](../requirements.txt)**: Berkas konfigurasi library dependensi terpusat di root proyek (memerlukan `requests`, `pandas`, dan `openpyxl`).
-* **`assign.xlsx`**: File Excel berisi daftar penugasan.
-* **`curl_pencacah.txt`**: Salinan cURL request dari tabel pencacah.
-* **`curl_pengawas.txt`**: Salinan cURL request dari tabel pengawas.
-* **`curl_sampel.txt`**: Salinan cURL request dari tabel sampel kegiatan.
-* **`curl_assign.txt`**: Salinan cURL request dari aksi assign manual 1x.
+* **[requirements.txt](../requirements.txt)**: Berkas konfigurasi library dependensi terpusat di root proyek.
+* **`assign.xlsx`**: File Excel berisi daftar penugasan (`idsbr`, `email_pencacah`, `email_pengawas`, `perusahaan`).
+* **`curl.txt`**: Cukup 1 salinan cURL dari request `datatable` di halaman penugasan web FASIH BPS.
+* **`completed_assign.json`**: Berkas checkpoint untuk mencatat sampel yang sudah berhasil di-assign (otomatis dibuat).
+* **`laporan_hasil_assign.csv`**: Berkas laporan hasil penugasan (otomatis diperbarui secara *upsert*).
 * **[mise.toml](../mise.toml)**: Konfigurasi runtime tool manager `mise` terpusat di root proyek.
 
 ---
@@ -40,18 +41,19 @@ Modul ini digunakan untuk mengotomatiskan proses *assignment* (penugasan) Pencac
 ## 🚀 Panduan Penggunaan (Step-by-Step)
 
 ### Langkah 1: Siapkan Autentikasi (cURL)
-Dapatkan 4 jenis file cURL dari browser Anda (Developer Tools F12 -> Network tab -> Klik Kanan -> Copy as cURL (bash)):
-1. **`curl_pencacah.txt`**: Salin request bernama `datatable?...` dari tabel pencacah.
-2. **`curl_pengawas.txt`**: Salin request bernama `datatable?...` dari tabel pengawas.
-3. **`curl_sampel.txt`**: Salin request bernama `datatable?...` dari tabel sampel kegiatan.
-4. **`curl_assign.txt`**: Lakukan uji coba assign manual 1x, lalu salin request bernama `assign-by-selection/...`.
+Cukup dapatkan **1 file cURL dari Datatable** di browser Anda (Developer Tools F12 -> Network tab -> Klik Kanan -> Copy as cURL (bash)):
+* Login ke web FASIH BPS, buka halaman penugasan, tekan **F12** $\rightarrow$ tab **Network**.
+* Cari request bernama **`datatable-all-user-survey-periode`** (atau request datatable lainnya).
+* Klik Kanan $\rightarrow$ **Copy** $\rightarrow$ **Copy as cURL (bash)**.
+* Paste ke file: **`assign/curl.txt`**.
+*(Catatan: Mode lama dengan 4 file cURL terpisah juga tetap didukung secara opsional).*
 
 ### Langkah 2: Siapkan Berkas Excel (`assign.xlsx`)
 Pastikan baris pertama (Header) Excel memiliki nama kolom persis seperti berikut (huruf kecil semua):
 * `idsbr` : ID Sampel target.
 * `email_pencacah` : Email petugas pencacah.
 * `email_pengawas` : Email petugas pengawas.
-* `perusahaan` : Nama Perusahaan/Usaha (sebagai backup jika idsbr tidak ada di 1000 data pertama).
+* `perusahaan` : Nama Perusahaan/Usaha (sebagai backup jika idsbr tidak ada di memori cache).
 
 ### Langkah 3: Jalankan Modul
 Buka terminal Anda di root direktori proyek, lalu jalankan:
@@ -61,10 +63,31 @@ python main.py assign
 
 ---
 
+## 🔄 Fitur Resume Progress & Laporan
+
+Modul `assign` dilengkapi dengan fitur pintar penanganan progress dan laporan:
+
+1. **Resume Progress (Auto-Skip)**:
+   * Setiap kali sampel berhasil di-assign (`Status 200/201`), sampel tersebut akan dicatat ke berkas checkpoint `completed_assign.json` dan `laporan_hasil_assign.csv`.
+   * Saat dijalankan ulang (*re-run*), script otomatis memindai riwayat penugasan yang sudah `Berhasil` dari berkas checkpoint dan `laporan_hasil_assign.csv`.
+   * Script akan menampilkan prompt:
+     `[?] Lanjutkan progress (melewati sampel yang sudah berhasil)? (Y/n):`
+   * Jika menjawab **Y** (atau menekan Enter), script akan **melewati (*skip*) sampel yang sudah berhasil** dan **hanya memproses sampel yang belum berhasil/gagal**.
+
+2. **Pembaruan Laporan CSV (Upsert Mode)**:
+   * Berkas `laporan_hasil_assign.csv` tidak akan ditimpa (*overwrite*) secara total.
+   * Apabila sampel yang sebelumnya berstatus `Gagal` berhasil di-assign pada eksekusi berikutnya, statusnya pada berkas CSV akan **otomatis diperbarui menjadi `Berhasil`**.
+
+3. **Reset Cache Otomatis saat Berganti Survei**:
+   * Apabila cURL yang disalin berasal dari kegiatan survei baru (`surveyPeriodId` baru), cache petugas lama (`data_pencacah.csv` & `data_pengawas.csv`) dan checkpoint lama akan otomatis dibersihkan agar tidak terjadi bentrok `allocationId` antar kegiatan.
+
+---
+
 ## 📝 Penjelasan Status Hasil Eksekusi & Logging
 
 * **`[SUKSES]`**: Proses assign/pemasangan PCL dan PML ke sampel berhasil (HTTP status 200 atau 201).
-* **`[GAGAL]`**: Proses dilewati (*skip*) karena sampel/petugas tidak ditemukan atau server menolak request.
+* **`[SKIPPED]`**: Sampel dilewati karena sudah berhasil di-assign pada eksekusi sebelumnya.
+* **`[GAGAL]`**: Proses dilewati (*skip*) karena sampel/petugas tidak ditemukan atau belum terdaftar pada kegiatan survei tersebut.
 * **`[ERROR]`**: Terjadi masalah teknis atau gangguan koneksi saat pemanggilan API.
 
 Seluruh riwayat eksekusi akan dicatat secara otomatis ke berkas `execution.log` di dalam folder ini (diabaikan dari Git).

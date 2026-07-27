@@ -59,11 +59,9 @@ HELP_STEPS = {
     ],
     "assign": [
         "1. Login ke website FASIH BPS di browser Anda dan tekan F12 untuk membuka Developer Tools -> tab 'Network'.",
-        "2. cURL Pencacah: Klik/filter tabel pencacah. Cari request bernama 'datatable?...' -> Klik Kanan -> Copy as cURL (bash) -> Paste ke: assign/curl_pencacah.txt",
-        "3. cURL Pengawas: Klik/filter tabel pengawas. Cari request bernama 'datatable?...' -> Klik Kanan -> Copy as cURL (bash) -> Paste ke: assign/curl_pengawas.txt",
-        "4. cURL Sampel: Klik/filter tabel sampel. Cari request bernama 'datatable?...' -> Klik Kanan -> Copy as cURL (bash) -> Paste ke: assign/curl_sampel.txt",
-        "5. cURL Assign: Uji coba assign manual 1x di web. Cari request 'assign-by-selection/...' -> Copy as cURL (bash) -> Paste ke: assign/curl_assign.txt",
-        "6. Excel: Siapkan berkas Excel di assign/assign.xlsx dengan kolom header: idsbr, email_pencacah, email_pengawas, perusahaan."
+        "2. Copy cURL Datatable: Cari request 'datatable-all-user-survey-periode' (atau request datatable lain) -> Klik Kanan -> Copy as cURL (bash).",
+        "3. Paste cURL tersebut ke berkas: assign/curl.txt",
+        "4. Excel: Siapkan berkas Excel di assign/assign.xlsx dengan kolom header: idsbr, email_pencacah, email_pengawas, perusahaan."
     ],
     "tarik-data": [
         "1. Login ke website FASIH BPS di browser Anda dan tekan F12 untuk membuka Developer Tools -> tab 'Network'.",

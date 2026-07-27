@@ -40,12 +40,10 @@ Proyek ini telah direstrukturisasi sehingga semua skrip di dalam sub-folder berf
 └── assign/                  # Modul: Auto Allocation (Assign)
     ├── __init__.py
     ├── hit_endpoint.py
-    ├── curl_assign.txt
-    ├── curl_pencacah.txt
-    ├── curl_pengawas.txt
-    ├── curl_sampel.txt
-    ├── assign.xlsx
-    └── data_pencacah.csv
+    ├── curl.txt             # Salinan cURL datatable penugasan (cukup 1 file)
+    ├── assign.xlsx          # Berkas Excel daftar target penugasan
+    ├── data_pencacah.csv
+    └── data_pengawas.csv
 │
 └── tarik-data/              # Modul: Tarik Data (Ekstraksi Data per Sub SLS)
     ├── __init__.py

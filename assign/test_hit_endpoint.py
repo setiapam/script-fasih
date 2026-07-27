@@ -79,6 +79,23 @@ class TestHitEndpoint(unittest.TestCase):
         self.assertEqual(normalize_email("user@bps.goid.id"), "user@bps.go.id")
         self.assertEqual(normalize_email("normal@gmail.com"), "normal@gmail.com")
 
+    def test_extract_survey_period_id(self):
+        from hit_endpoint import extract_survey_period_id_from_file
+        content = """curl 'https://fasih-sm.bps.go.id/app/api/assignment-general/api/assign-by-selection-allocation/074028fe-24ed-4ccd-afe5-6b6aec27e13e' \\
+  -H 'Cookie: foo=bar'"""
+        filepath = self.create_temp_curl_file(content)
+        survey_period_id = extract_survey_period_id_from_file(filepath)
+        self.assertEqual(survey_period_id, "074028fe-24ed-4ccd-afe5-6b6aec27e13e")
+
+    def test_extract_survey_period_id_from_datatable(self):
+        from hit_endpoint import extract_survey_period_id_from_file
+        content = """curl 'https://fasih-sm.bps.go.id/app/api/analytic/api/v2/assignment/datatable-all-user-survey-periode' \\
+  -H 'Cookie: foo=bar' \\
+  --data-raw '{"assignmentExtraParam":{"surveyPeriodId":"074028fe-24ed-4ccd-afe5-6b6aec27e13e"}}'"""
+        filepath = self.create_temp_curl_file(content)
+        survey_period_id = extract_survey_period_id_from_file(filepath)
+        self.assertEqual(survey_period_id, "074028fe-24ed-4ccd-afe5-6b6aec27e13e")
+
 if __name__ == '__main__':
     import unittest.mock
     unittest.main()

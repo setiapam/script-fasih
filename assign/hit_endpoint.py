@@ -48,6 +48,41 @@ def parse_curl(filepath):
     
     return url, cookie, xsrf
 
+def extract_survey_period_id_from_file(filepath):
+    if not os.path.exists(filepath):
+        return ""
+    with open(filepath, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    # 1. Parameter surveyPeriodId di Query String
+    match = re.search(r'surveyPeriodId=([a-f0-9\-]{36})', content, re.IGNORECASE)
+    if match:
+        return match.group(1)
+        
+    # 2. Key surveyPeriodId di Body Payload JSON
+    match = re.search(r'["\']surveyPeriodId["\']\s*:\s*["\']([a-f0-9\-]{36})["\']', content, re.IGNORECASE)
+    if match:
+        return match.group(1)
+        
+    # 3. Path assign-by-selection-allocation/...
+    match = re.search(r'assign-by-selection-allocation/([a-f0-9\-]{36})', content, re.IGNORECASE)
+    if match:
+        return match.group(1)
+        
+    # 4. Path /surveys/<surveyId>/<surveyPeriodId>/...
+    match = re.search(r'/surveys/[a-f0-9\-]{36}/([a-f0-9\-]{36})', content, re.IGNORECASE)
+    if match:
+        return match.group(1)
+
+    # 5. UUID 36 Karakter dari URL
+    url_match = re.search(r"(https?://[^\s'\"^\\]+)", content)
+    if url_match:
+        uuid_match = re.search(r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', url_match.group(1))
+        if uuid_match:
+            return uuid_match.group(1)
+            
+    return ""
+
 def get_headers(cookie, xsrf):
     return {
         'Accept': 'application/json',
@@ -230,6 +265,38 @@ def fetch_single_sample_on_demand(url, headers, survey_period_id, keyword, targe
     return None
 
 
+def fetch_single_user_on_demand(headers, survey_period_id, email):
+    """Mencari 1 user (PCL/PML) secara spesifik berdasarkan email jika belum ada di cache"""
+    import urllib.parse
+    email_clean = str(email).strip().lower()
+    if not email_clean: return None
+    
+    url = f"https://fasih-sm.bps.go.id/app/api/survey-user/api/v1/allocations-view/by-user?surveyPeriodId={survey_period_id}&keyword={urllib.parse.quote(email_clean)}"
+    
+    for attempt in range(2):
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                json_resp = response.json()
+                data = extract_list_from_json(json_resp)
+                for item in data:
+                    if not isinstance(item, dict): continue
+                    item_email = (item.get('email') or item.get('username') or '').strip().lower()
+                    if not item_email and 'user' in item and isinstance(item['user'], dict):
+                        item_email = (item['user'].get('email') or item['user'].get('username') or '').strip().lower()
+                        
+                    if item_email == email_clean or email_clean in item_email:
+                        alloc_id = item.get('allocationId') or item.get('id')
+                        if not alloc_id and isinstance(item.get('regions'), list) and len(item['regions']) > 0:
+                            alloc_id = item['regions'][0].get('allocationId')
+                        if alloc_id:
+                            return alloc_id
+                break
+        except Exception:
+            time.sleep(0.5)
+    return None
+
+
 def save_dict_to_csv(data_dict, filename, col1_name, col2_name):
     if data_dict:
         df = pd.DataFrame(list(data_dict.items()), columns=[col1_name, col2_name])
@@ -238,36 +305,174 @@ def save_dict_to_csv(data_dict, filename, col1_name, col2_name):
 # ================= EKSEKUSI UTAMA =================
 def main():
     print("Membaca konfigurasi file cURL...")
-    url_pcl, cookie_pcl, xsrf_pcl = parse_curl(FILE_CURL_PCL)
-    url_pml, cookie_pml, xsrf_pml = parse_curl(FILE_CURL_PML)
-    url_sampel, cookie_sampel, xsrf_sampel = parse_curl(FILE_CURL_SAMPEL)
-    url_assign, cookie_assign, xsrf_assign = parse_curl(FILE_CURL_ASSIGN)
     
-    headers_pcl = get_headers(cookie_pcl, xsrf_pcl)
-    headers_pml = get_headers(cookie_pml, xsrf_pml)
-    headers_sampel = get_headers(cookie_sampel, xsrf_sampel)
-    headers_assign = get_headers(cookie_assign, xsrf_assign)
+    # Cek apakah user punya 4 file cURL lama terpisah secara lengkap
+    has_legacy_all_files = (
+        os.path.exists(FILE_CURL_PCL) and 
+        os.path.exists(FILE_CURL_PML) and 
+        os.path.exists(FILE_CURL_SAMPEL) and 
+        os.path.exists(FILE_CURL_ASSIGN)
+    )
     
-    if not url_assign:
-        print("❌ Proses dihentikan karena cURL Assign gagal dibaca.")
+    # Prioritas file cURL tunggal
+    single_curl_candidates = ['curl.txt', FILE_CURL_ASSIGN, FILE_CURL_SAMPEL, FILE_CURL_PCL, FILE_CURL_PML]
+    found_single_curl = None
+    for cfile in ['curl.txt'] + single_curl_candidates[1:]:
+        if os.path.exists(cfile):
+            found_single_curl = cfile
+            break
+
+    if has_legacy_all_files and not os.path.exists('curl.txt'):
+        print("ℹ️ Menggunakan mode multi-cURL terpisah (legacy).")
+        url_pcl, cookie_pcl, xsrf_pcl = parse_curl(FILE_CURL_PCL)
+        url_pml, cookie_pml, xsrf_pml = parse_curl(FILE_CURL_PML)
+        url_sampel, cookie_sampel, xsrf_sampel = parse_curl(FILE_CURL_SAMPEL)
+        url_assign, cookie_assign, xsrf_assign = parse_curl(FILE_CURL_ASSIGN)
+        
+        headers_pcl = get_headers(cookie_pcl, xsrf_pcl)
+        headers_pml = get_headers(cookie_pml, xsrf_pml)
+        headers_sampel = get_headers(cookie_sampel, xsrf_sampel)
+        headers_assign = get_headers(cookie_assign, xsrf_assign)
+        
+        survey_period_id = extract_survey_period_id_from_file(FILE_CURL_ASSIGN) or (url_assign.split('/')[-1] if url_assign else "")
+    elif found_single_curl:
+        print(f"ℹ️ Menggunakan mode 1 cURL terpusat dari '{found_single_curl}'.")
+        url_main, cookie, xsrf = parse_curl(found_single_curl)
+        if not cookie and not xsrf:
+            print(f"❌ File {found_single_curl} kosong atau gagal dibaca.")
+            return
+            
+        headers = get_headers(cookie, xsrf)
+        survey_period_id = extract_survey_period_id_from_file(found_single_curl)
+        
+        if not survey_period_id:
+            print("❌ Gagal mengekstrak surveyPeriodId dari cURL. Pastikan cURL valid.")
+            return
+            
+        url_assign = f"https://fasih-sm.bps.go.id/app/api/assignment-general/api/assign-by-selection-allocation/{survey_period_id}"
+        url_sampel = "https://fasih-sm.bps.go.id/app/api/analytic/api/v2/assignment/datatable-all-user-survey-periode"
+        url_pcl = f"https://fasih-sm.bps.go.id/app/api/survey-user/api/v1/allocations-view/by-user?surveyPeriodId={survey_period_id}"
+        url_pml = url_pcl
+        
+        headers_pcl = headers
+        headers_pml = headers
+        headers_sampel = headers
+        headers_assign = headers
+    else:
+        print("❌ File cURL tidak ditemukan! Sediakan 1 file 'curl.txt' di folder 'assign/'.")
+        return
+
+    if not survey_period_id:
+        print("❌ Proses dihentikan karena surveyPeriodId tidak ditemukan.")
         return
         
-    survey_period_id = url_assign.split('/')[-1]
-    
+    print(f"[*] Terdeteksi surveyPeriodId: {survey_period_id}")
+
+    # Cek apakah kegiatan survei berganti (surveyPeriodId baru)
+    config_file = 'config.json'
+    prev_period_id = None
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                cdata = json.load(f)
+                prev_period_id = cdata.get('surveyPeriodId')
+        except Exception:
+            pass
+
+    if prev_period_id and prev_period_id != survey_period_id:
+        print(f"🔄 Terdeteksi pergantian kegiatan survei (Periode Baru: {survey_period_id} | Lama: {prev_period_id}).")
+        print("   Mereset cache petugas lama (data_pencacah.csv & data_pengawas.csv)...")
+        if os.path.exists('data_pencacah.csv'): os.remove('data_pencacah.csv')
+        if os.path.exists('data_pengawas.csv'): os.remove('data_pengawas.csv')
+
+    # Simpan surveyPeriodId aktif ke config.json
+    try:
+        with open(config_file, 'w', encoding='utf-8') as f:
+            json.dump({'surveyPeriodId': survey_period_id}, f, indent=2)
+    except Exception:
+        pass
+
     # 1. Tarik Kamus Data Cache
     dict_pencacah = fetch_all_users(url_pcl, headers_pcl, "Pencacah")
     dict_pengawas = fetch_all_users(url_pml, headers_pml, "Pengawas")
     dict_sampel = fetch_all_samples(url_sampel, headers_sampel, survey_period_id)
     
+    # Muat dari CSV cache jika ada
+    def load_dict_from_csv(filename):
+        u_dict = {}
+        if os.path.exists(filename):
+            try:
+                df_csv = pd.read_csv(filename, dtype=str)
+                for _, r in df_csv.iterrows():
+                    em = str(r['Email']).strip().lower()
+                    rid = str(r['RoleUserID']).strip()
+                    if em and rid and rid != 'nan': u_dict[em] = rid
+            except Exception: pass
+        return u_dict
+
+    csv_pcl = load_dict_from_csv('data_pencacah.csv')
+    csv_pml = load_dict_from_csv('data_pengawas.csv')
+    for k, v in csv_pcl.items(): dict_pencacah.setdefault(k, v)
+    for k, v in csv_pml.items(): dict_pengawas.setdefault(k, v)
+
     save_dict_to_csv(dict_pencacah, 'data_pencacah.csv', 'Email', 'RoleUserID')
     save_dict_to_csv(dict_pengawas, 'data_pengawas.csv', 'Email', 'RoleUserID')
     
-    # 2. Baca File Excel
+    # 2. Muat Checkpoint Progress Penugasan Berhasil (completed_assign.json & laporan_hasil_assign.csv)
+    COMPLETED_FILE = "completed_assign.json"
+    REPORT_FILE = "laporan_hasil_assign.csv"
+    completed_assign = {}
+    if os.path.exists(COMPLETED_FILE):
+        try:
+            with open(COMPLETED_FILE, "r", encoding="utf-8") as f:
+                completed_assign = json.load(f)
+        except Exception:
+            completed_assign = {}
+
+    if completed_assign.get("surveyPeriodId") != survey_period_id:
+        completed_assign = {"surveyPeriodId": survey_period_id, "success_idsbr": []}
+
+    success_set = set(completed_assign.get("success_idsbr", []))
+
+    # Baca juga dari laporan_hasil_assign.csv jika ada (agar riwayat dari eksekusi sebelumnya langsung terdeteksi)
+    if os.path.exists(REPORT_FILE):
+        try:
+            df_rep = pd.read_csv(REPORT_FILE, dtype=str)
+            for _, r in df_rep.iterrows():
+                idsbr_val = str(r['IDSBR']).strip()
+                status_val = str(r['Status']).strip()
+                if idsbr_val and idsbr_val != 'nan' and 'Berhasil' in status_val:
+                    success_set.add(idsbr_val)
+        except Exception:
+            pass
+
+    completed_assign["success_idsbr"] = list(success_set)
+    try:
+        with open(COMPLETED_FILE, "w", encoding="utf-8") as f:
+            json.dump(completed_assign, f, indent=2)
+    except Exception:
+        pass
+
+    # 3. Baca File Excel
     try:
         df = pd.read_excel(EXCEL_FILE, dtype=str)
     except Exception as e:
         print(f"\n❌ Gagal membaca file Excel: {e}")
         return
+
+    if success_set:
+        print(f"\n[*] Ditemukan progress penugasan sebelumnya:")
+        print(f"    - Sampel sudah berhasil di-assign : {len(success_set)}")
+        resume = input("[?] Lanjutkan progress (melewati sampel yang sudah berhasil)? (Y/n): ").strip().lower()
+        if resume == 'n':
+            print("[*] Memulai ulang dari awal (mereset progress penugasan)...")
+            success_set = set()
+            completed_assign["success_idsbr"] = []
+            try:
+                with open(COMPLETED_FILE, "w", encoding="utf-8") as f:
+                    json.dump(completed_assign, f, indent=2)
+            except Exception:
+                pass
         
     # Validasi apakah kolom 'perusahaan' sudah dibuat di Excel
     kolom_tersedia = df.columns.tolist()
@@ -297,6 +502,13 @@ def main():
         if sampel_excel.endswith('.0'):
             sampel_excel = sampel_excel[:-2]
             
+        if sampel_excel in success_set:
+            log_msg = f"Memproses baris {index+1} | IDSBR: {sampel_excel} -> [SKIPPED] Sudah berhasil di-assign sebelumnya."
+            print(log_msg)
+            sukses += 1
+            log_assignment.append({"IDSBR": sampel_excel, "Status": "Berhasil (Skipped - Ter-assign Sebelumnya)"})
+            continue
+
         email_pcl = normalize_email(row[KOLOM_PCL])
         email_pml = normalize_email(row[KOLOM_PML])
         
@@ -316,27 +528,35 @@ def main():
         
         # JIKA GAGAL DITEMUKAN DI CACHE: Lakukan Pencarian On-Demand
         if not sample_id:
-            # Utamakan cari berdasarkan Nama Perusahaan
-            if nama_perusahaan:
-                p_msg = f"🔍 [Pencarian Perusahaan] Mencari: '{nama_perusahaan}' (IDSBR: {sampel_excel})..."
+            # 1. Utamakan pencarian presisi berdasarkan angka IDSBR
+            f_msg = f"🔍 [Pencarian IDSBR] Mencari sampel ke server berdasarkan IDSBR: {sampel_excel}..."
+            print(f_msg)
+            with open(log_file, "a", encoding="utf-8") as lf:
+                lf.write(f_msg + "\n")
+            sample_id = fetch_single_sample_on_demand(url_sampel, headers_sampel, survey_period_id, keyword=sampel_excel, target_idsbr=sampel_excel)
+            
+            # 2. Jika IDSBR tidak ketemu, Fallback cari berdasarkan Nama Perusahaan
+            if not sample_id and nama_perusahaan:
+                p_msg = f"🔍 [Pencarian Perusahaan] Fallback mencari berdasarkan Nama Perusahaan: '{nama_perusahaan}'..."
                 print(p_msg)
                 with open(log_file, "a", encoding="utf-8") as lf:
                     lf.write(p_msg + "\n")
                 sample_id = fetch_single_sample_on_demand(url_sampel, headers_sampel, survey_period_id, keyword=nama_perusahaan, target_idsbr=sampel_excel)
-            
-            # Jika perusahaan kosong atau tidak ketemu, Fallback cari pakai angka IDSBR-nya sendiri
-            if not sample_id:
-                f_msg = f"🔍 [Pencarian IDSBR] Mencari fallback: {sampel_excel}..."
-                print(f_msg)
-                with open(log_file, "a", encoding="utf-8") as lf:
-                    lf.write(f_msg + "\n")
-                sample_id = fetch_single_sample_on_demand(url_sampel, headers_sampel, survey_period_id, keyword=sampel_excel, target_idsbr=sampel_excel)
 
             if sample_id:
                 dict_sampel[sampel_excel] = sample_id # Simpan hasil yang baru ketemu
             
         pcl_id = dict_pencacah.get(email_pcl)
+        if not pcl_id and email_pcl:
+            pcl_id = fetch_single_user_on_demand(headers_pcl, survey_period_id, email_pcl)
+            if pcl_id:
+                dict_pencacah[email_pcl] = pcl_id
+
         pml_id = dict_pengawas.get(email_pml)
+        if not pml_id and email_pml:
+            pml_id = fetch_single_user_on_demand(headers_pml, survey_period_id, email_pml)
+            if pml_id:
+                dict_pengawas[email_pml] = pml_id
         
         if not sample_id:
             msg = f" -> [GAGAL] Lewati {sampel_excel}: Sampel tidak ditemukan meski sudah dicari manual."
@@ -348,20 +568,20 @@ def main():
                 lf.write(msg + "\n")
             continue
         if not pcl_id:
-            msg = f" -> [GAGAL] Lewati {sampel_excel}: Pencacah '{email_pcl}' tidak ditemukan."
+            msg = f" -> [GAGAL] Lewati {sampel_excel}: Pencacah '{email_pcl}' belum terdaftar/dialokasikan pada kegiatan survei ini (surveyPeriodId: {survey_period_id})."
             print(msg)
             gagal += 1
-            log_assignment.append({"IDSBR": sampel_excel, "Status": f"Gagal - PCL {email_pcl} tidak ada"})
-            failed_details.append({"idsbr": sampel_excel, "reason": f"Pencacah '{email_pcl}' tidak terdaftar"})
+            log_assignment.append({"IDSBR": sampel_excel, "Status": f"Gagal - PCL {email_pcl} belum terdaftar di survei ini"})
+            failed_details.append({"idsbr": sampel_excel, "reason": f"Pencacah '{email_pcl}' belum dialokasikan pada kegiatan survei ini di FASIH BPS"})
             with open(log_file, "a", encoding="utf-8") as lf:
                 lf.write(msg + "\n")
             continue
         if not pml_id:
-            msg = f" -> [GAGAL] Lewati {sampel_excel}: Pengawas '{email_pml}' tidak ditemukan."
+            msg = f" -> [GAGAL] Lewati {sampel_excel}: Pengawas '{email_pml}' belum terdaftar/dialokasikan pada kegiatan survei ini (surveyPeriodId: {survey_period_id})."
             print(msg)
             gagal += 1
-            log_assignment.append({"IDSBR": sampel_excel, "Status": f"Gagal - PML {email_pml} tidak ada"})
-            failed_details.append({"idsbr": sampel_excel, "reason": f"Pengawas '{email_pml}' tidak terdaftar"})
+            log_assignment.append({"IDSBR": sampel_excel, "Status": f"Gagal - PML {email_pml} belum terdaftar di survei ini"})
+            failed_details.append({"idsbr": sampel_excel, "reason": f"Pengawas '{email_pml}' belum dialokasikan pada kegiatan survei ini di FASIH BPS"})
             with open(log_file, "a", encoding="utf-8") as lf:
                 lf.write(msg + "\n")
             continue
@@ -383,6 +603,15 @@ def main():
                 print(msg)
                 sukses += 1
                 log_assignment.append({"IDSBR": sampel_excel, "Status": "Berhasil"})
+
+                # Simpan ke completed_assign.json
+                success_set.add(sampel_excel)
+                completed_assign["success_idsbr"] = list(success_set)
+                try:
+                    with open(COMPLETED_FILE, "w", encoding="utf-8") as f:
+                        json.dump(completed_assign, f, indent=2)
+                except Exception:
+                    pass
             else:
                 msg = f" -> [GAGAL] Gagal Assign - {sampel_excel} | Server merespon: {assign_req.status_code}"
                 print(msg)
@@ -422,10 +651,28 @@ def main():
     with open(log_file, "a", encoding="utf-8") as lf:
         lf.write(summary_text + "\n")
     
+    REPORT_FILE = 'laporan_hasil_assign.csv'
     if log_assignment:
-        df_log = pd.DataFrame(log_assignment)
-        df_log.to_csv('laporan_hasil_assign.csv', index=False)
-        print("\n📝 File 'laporan_hasil_assign.csv' berhasil dibuat!")
+        existing_report = {}
+        if os.path.exists(REPORT_FILE):
+            try:
+                df_old = pd.read_csv(REPORT_FILE, dtype=str)
+                for _, r in df_old.iterrows():
+                    idsbr_val = str(r['IDSBR']).strip()
+                    status_val = str(r['Status']).strip()
+                    if idsbr_val and idsbr_val != 'nan':
+                        existing_report[idsbr_val] = status_val
+            except Exception:
+                pass
+
+        for item in log_assignment:
+            idsbr_val = str(item['IDSBR']).strip()
+            status_val = str(item['Status']).strip()
+            existing_report[idsbr_val] = status_val
+
+        df_log = pd.DataFrame(list(existing_report.items()), columns=['IDSBR', 'Status'])
+        df_log.to_csv(REPORT_FILE, index=False)
+        print(f"\n📝 File '{REPORT_FILE}' berhasil diperbarui dengan status terbaru!")
 
 if __name__ == "__main__":
     main()
