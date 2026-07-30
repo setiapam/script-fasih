@@ -54,6 +54,14 @@ Proyek ini telah direstrukturisasi sehingga semua skrip di dalam sub-folder berf
     ├── subsls_target.xlsx
     ├── region_db.json
     └── result.xlsx
+│
+└── rekap/                   # Modul: Rekap Progress Petugas Pencacah & Pengawas
+    ├── __init__.py
+    ├── hit_endpoint.py
+    ├── curl.txt
+    ├── rekap.xlsx
+    ├── progress.json
+    └── hasil_rekap.xlsx
 ```
 
 ---
@@ -91,6 +99,7 @@ python main.py clear-assignment
 python main.py clear-petugas
 python main.py assign
 python main.py tarik-data
+python main.py rekap
 ```
 
 ### 3. Melihat Bantuan Langkah Persiapan (Sebelum Run Script)
@@ -105,6 +114,7 @@ python main.py help clear-assignment
 python main.py help clear-petugas
 python main.py help assign
 python main.py help tarik-data
+python main.py help rekap
 ```
 
 *Catatan: Saat modul dijalankan lewat `main.py`, runner akan otomatis mengubah direktori kerja (working directory) secara dinamis ke folder modul tersebut agar seluruh file input/output (seperti `curl.txt`, `ids.json`) dibaca dan ditulis dari dalam folder masing-masing.*
@@ -202,4 +212,6 @@ Untuk melihat instruksi spesifik cara mendapatkan token cURL dan detail teknis m
 * **[Dokumentasi Modul Clear Petugas](clear-petugas/README.md)**
 * **[Dokumentasi Modul Assign](assign/README.md)**
 * **[Dokumentasi Modul Tarik Data](tarik-data/README.md)**
+* **[Dokumentasi Modul Rekap](rekap/README.md)**
+
 

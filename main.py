@@ -29,6 +29,11 @@ MODULES = {
         "name": "tarik-data",
         "title": "Tarik Data (Ekstraksi Data per Sub SLS)",
         "desc": "Menarik data penugasan berdasarkan daftar kode Sub SLS dari database wilayah."
+    },
+    "6": {
+        "name": "rekap",
+        "title": "Rekap (Rekap Progress Petugas Pencacah & Pengawas)",
+        "desc": "Mengambil data rekap progress masing-masing petugas pencacah (PPL) dan pengawas (PML) berdasarkan email."
     }
 }
 
@@ -69,6 +74,15 @@ HELP_STEPS = {
         "3. cURL Region: Klik dropdown wilayah (misal Provinsi), cari request '/region/level' -> Copy as cURL (bash) -> Paste ke: tarik-data/curl_region.txt",
         "4. Tunggu proses pembangunan database wilayah selesai (level 1-6: Provinsi s.d. Sub SLS).",
         "5. Siapkan daftar kode fullCode sub SLS target di file Excel: tarik-data/subsls_target.xlsx (kolom pertama berisi kode sub SLS)."
+    ],
+    "rekap": [
+        "1. Login ke website FASIH BPS di browser Anda dan tekan F12 untuk membuka Developer Tools -> tab 'Network'.",
+        "2. Buka halaman Report Progress (pengawas atau pencacah) dan klik salah satu petugas.",
+        "3. Cari request POST ke '.../report-progress-by-responsibility' -> Klik kanan -> Copy as cURL (bash).",
+        "4. Paste cURL tersebut ke file: rekap/curl.txt",
+        "5. Siapkan file Excel daftar petugas di: rekap/rekap.xlsx",
+        "   Format: Sheet pertama, Kolom E=Nama Mitra, Kolom F=Email Mitra, Kolom D=PML (untuk pengawas).",
+        "6. Jalankan script. Jika session habis, update curl.txt dengan cURL baru dan jalankan ulang (otomatis resume)."
     ]
 }
 
@@ -150,7 +164,7 @@ def show_menu():
     print(" q. Keluar")
     print("-" * 60)
     
-    choice = input("Masukkan pilihan Anda (1/2/3/4/5/h/q): ").strip().lower()
+    choice = input("Masukkan pilihan Anda (1/2/3/4/5/6/h/q): ").strip().lower()
     if choice == 'q':
         print("[*] Selesai.")
         sys.exit(0)
