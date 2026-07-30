@@ -1133,7 +1133,13 @@ def main():
                 already_done.add(email_key)
 
     if already_done:
-        print(f"   ✓ Melanjutkan progress sebelumnya ({len(already_done)}/{len(petugas_list)} petugas sudah selesai).")
+        existing_in_list = sum(1 for p in petugas_list if p['email'] in already_done)
+        remaining = len(petugas_list) - existing_in_list
+        print(f"   ✓ Ditemukan cache progress: {existing_in_list}/{len(petugas_list)} petugas di Excel sudah pernah diambil.")
+        if remaining > 0:
+            print(f"   → Hanya mengambil {remaining} petugas baru yang belum ada di cache...")
+        else:
+            print(f"   → Semua {len(petugas_list)} petugas di Excel sudah ada di cache.")
     else:
         progress = {'results': {}}
 
@@ -1262,13 +1268,12 @@ def main():
         print(f"\n  ⚠ Session habis. Update rekap/curl.txt lalu jalankan ulang script ini untuk melanjutkan.")
     print("=" * 60)
 
-    # Cleanup progress file hanya jika SEMUA berhasil 100%
-    if total_processed == total_all and fail_count == 0:
-        if os.path.exists(PROGRESS_FILE):
-            os.remove(PROGRESS_FILE)
-            print("[*] File progress.json dihapus (semua data berhasil diproses).")
+    # Simpan progress akhir (progress.json dipertahankan sebagai cache)
+    save_progress(progress)
 
     log_message(f"=== Selesai: {total_processed}/{total_all} berhasil, {fail_count} gagal ===")
+    print("\n[i] Data progress tersimpan di 'rekap/progress.json'.")
+    print("    Hapus file 'rekap/progress.json' jika Anda ingin mengambil ulang seluruh data dari awal.")
 
 
 def summary_empty():
