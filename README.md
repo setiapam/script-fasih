@@ -18,8 +18,9 @@ Proyek ini telah direstrukturisasi sehingga semua skrip di dalam sub-folder berf
 ├── approve/                 # Modul: Bulk Approval Penugasan
 │   ├── __init__.py
 │   ├── hit_endpoint.py      # Kode utama modul
-│   ├── curl.txt             # Salinan cURL (auth) khusus modul
-│   └── ids.json             # Database target ID modul
+│   ├── curl.txt             # Salinan cURL datatable penugasan khusus modul
+│   ├── config.json          # Konfigurasi surveyPeriodId aktif
+│   └── ids.json             # Database target ID modul (auto-generated / disunting manual)
 │
 ├── clear-assignment/        # Modul: Clear Assignment massal via email
 │   ├── __init__.py

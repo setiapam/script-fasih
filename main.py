@@ -8,7 +8,7 @@ MODULES = {
     "1": {
         "name": "approve",
         "title": "Approve (Bulk Approval Penugasan)",
-        "desc": "Mengotomatiskan approval massal berdasarkan target ID di ids.json."
+        "desc": "Menarik ID dari DataTables API (otomatis pagination) dan melakukan approval massal."
     },
     "2": {
         "name": "clear-assignment",
@@ -42,10 +42,10 @@ HELP_STEPS = {
     "approve": [
         "1. Login ke website FASIH BPS di browser Anda.",
         "2. Tekan F12 untuk membuka Developer Tools, lalu pilih tab 'Network'.",
-        "3. Lakukan aksi persetujuan (approval) secara manual 1x pada web untuk memicu pemanggilan API.",
-        "4. Cari request POST ke '.../api/v2/approval', klik kanan -> Copy -> Copy as cURL (bash).",
+        "3. Cari request DataTables penugasan ('datatable-all-user-survey-periode' atau sejenisnya).",
+        "4. Klik kanan pada request tersebut -> Copy -> Copy as cURL (bash).",
         "5. Paste cURL tersebut ke file: approve/curl.txt",
-        "6. Siapkan daftar ID assignment yang ingin Anda setujui secara massal di berkas: approve/ids.json dalam format array JSON."
+        "6. Jalankan script. Script akan otomatis menarik seluruh ID assignment (dengan pagination) ke approve/ids.json lalu melakukan approval massal."
     ],
     "clear-assignment": [
         "1. Login ke website FASIH BPS di browser Anda.",
