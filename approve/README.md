@@ -6,10 +6,14 @@ Modul ini digunakan untuk mengotomatiskan persetujuan (*approval*) penugasan (*a
 
 ## 📋 Alur Kerja (Workflow)
 
-1. **Autentikasi & Konfigurasi**: Script membaca perintah cURL dari [curl.txt](curl.txt) (salinan cURL DataTables dari browser) untuk mengambil cookies sesi browser aktif, headers HTTP, dan parameter pencarian DataTables.
-2. **Penarikan Target ID Otomatis**: Script menghubungi API DataTables penugasan (`.../datatable-all-user-survey-periode`) secara otomatis dari halaman 1 hingga selesai (dukungan penuh pagination) untuk mengekstrak seluruh ID assignment dan menyimpannya ke [ids.json](ids.json). Jika [ids.json](ids.json) sudah ada, script akan menanyakan apakah Anda ingin memakai ID yang tersimpan atau menarik data baru dari server.
-3. **Eksekusi Approval**: Script melakukan POST request secara berurutan ke API Endpoint Approval (`https://fasih-sm.bps.go.id/assignment-approval/api/v2/approval`) untuk setiap ID yang tertera dengan data payload multipart:
-   - `assignmentId`: ID dari `ids.json`
+1. **Autentikasi & Konfigurasi**: Script membaca perintah cURL dari [curl.txt](curl.txt) (salinan cURL DataTables dari browser) untuk mengambil cookies sesi browser aktif, headers HTTP, dan parameter pencarian DataTables. Anda juga dapat menentukan ID penugasan secara spesifik.
+2. **Pemilihan Mode Penarikan Target ID**: Script menampilkan menu interaktif saat dijalankan. Anda dapat memilih sumber ID:
+   - Ambil dari API DataTables penugasan (`.../datatable-all-user-survey-periode`) secara otomatis dari halaman 1 hingga selesai (dukungan penuh pagination) untuk mengekstrak seluruh ID assignment.
+   - Gunakan ID dari [ids.json](ids.json) yang telah disimpan dari hasil penarikan sebelumnya.
+   - Baca daftar ID spesifik dari berkas `id_spesifik.txt`.
+   - Masukkan ID spesifik secara manual via terminal.
+3. **Eksekusi Approval**: Script melakukan POST request secara berurutan ke API Endpoint Approval (`https://fasih-sm.bps.go.id/app/api/assignment-approval/api/v2/approval`) untuk setiap ID yang tertera dengan data payload:
+   - `assignmentId`: ID dari sumber yang dipilih
    - `statusApproval`: `true`
    - `comment`: `{"dataKey":"","notes":[]}`
 
@@ -30,8 +34,9 @@ Modul ini digunakan untuk mengotomatiskan persetujuan (*approval*) penugasan (*a
 * **[hit_endpoint.py](hit_endpoint.py)**: Kode utama script otomatisasi Python.
 * **[__init__.py](__init__.py)**: Inisialisasi modul untuk runner utama.
 * **[requirements.txt](../requirements.txt)**: Berkas konfigurasi library dependensi terpusat di root proyek.
-* **[curl.txt](curl.txt)**: Tempat menempelkan salinan perintah cURL DataTables penugasan dari browser Anda (berfungsi sebagai sumber autentikasi sesi dan parameter filter).
+* **[curl.txt](curl.txt)**: Tempat menempelkan salinan perintah cURL DataTables penugasan dari browser Anda (berfungsi sebagai sumber autentikasi sesi dan parameter filter). Wajib ada jika Anda memilih opsi pengambilan ID via API DataTables.
 * **[ids.json](ids.json)**: Berkas JSON tempat menyimpan otomatis daftar ID penugasan (dapat di-generate otomatis oleh script atau disunting manual bila diperlukan).
+* **id_spesifik.txt**: (Opsional) Berkas teks untuk memuat daftar target ID secara spesifik (satu baris satu ID).
 * **[config.json](config.json)**: Berkas yang mencatat `surveyPeriodId` kegiatan aktif untuk mendeteksi pergantian kegiatan survei secara otomatis.
 * **[mise.toml](../mise.toml)**: Konfigurasi runtime tool manager `mise` terpusat di root proyek.
 
@@ -52,8 +57,20 @@ Buka terminal Anda di root direktori proyek, lalu jalankan:
 ```bash
 python main.py approve
 ```
-* **Otomatisasi ID**: Script akan membaca cURL di `curl.txt`, lalu secara otomatis mengambil seluruh ID assignment (melintasi seluruh halaman/pagination) dari server dan menyimpannya ke `approve/ids.json`.
-* **Proses Approval**: Setelah mengonfirmasi jumlah ID target, script akan menyetujui (*approve*) seluruh penugasan tersebut secara massal.
+Atau Anda bisa menjalankan `python main.py` lalu pilih menu `approve`.
+
+### Langkah 3: Pilih Mode Pencarian
+Di dalam terminal, Anda akan diminta untuk memilih mode:
+```text
+[?] Pilih sumber ID untuk diproses:
+1. Ambil dari API DataTables (otomatis semua hasil dari curl)
+2. Gunakan ID dari berkas ids.json (cache/sebelumnya)
+3. Baca dari berkas id_spesifik.txt (satu ID per baris)
+4. Masukkan ID secara manual via terminal
+```
+Silakan pilih nomor yang sesuai dengan kebutuhan Anda.
+
+* Setelah mengonfirmasi, script akan menyetujui (*approve*) seluruh penugasan tersebut secara massal dan berurutan.
 
 
 ---

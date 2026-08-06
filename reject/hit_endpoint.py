@@ -9,7 +9,7 @@ def parse_curl(curl_command):
     """
     Membaca raw cURL command, mengekstrak headers, cookies, URL, dan data payload.
     """
-    curl_command = curl_command.replace('\\\n', ' ').replace('\\\r\n', ' ')
+    curl_command = curl_command.replace('\\\\n', ' ').replace('\\\\r\\\\n', ' ')
     try:
         tokens = shlex.split(curl_command)
     except ValueError as e:
@@ -79,8 +79,8 @@ def split_curl_commands(content):
     """
     Memisahkan satu file yang berisi banyak perintah curl.
     """
-    normalized = content.replace('\\\n', ' ').replace('\\\r\n', ' ')
-    parts = re.split(r'\bcurl\s+', normalized, flags=re.IGNORECASE)
+    normalized = content.replace('\\\\n', ' ').replace('\\\\r\\\\n', ' ')
+    parts = re.split(r'\\bcurl\\s+', normalized, flags=re.IGNORECASE)
     commands = []
     for part in parts:
         part = part.strip()
@@ -105,15 +105,15 @@ def extract_survey_period_id(parsed_curl, raw_curl_content=""):
         except Exception:
             pass
 
-    match = re.search(r'["\']surveyPeriodId["\']\s*:\s*["\']([a-f0-9\-]{36})["\']', raw_curl_content, re.IGNORECASE)
+    match = re.search(r'["\']surveyPeriodId["\']\\s*:\\s*["\']([a-f0-9\\-]{36})["\']', raw_curl_content, re.IGNORECASE)
     if match:
         return match.group(1)
 
-    match = re.search(r'/surveys/[a-f0-9\-]{36}/([a-f0-9\-]{36})', raw_curl_content, re.IGNORECASE)
+    match = re.search(r'/surveys/[a-f0-9\\-]{36}/([a-f0-9\\-]{36})', raw_curl_content, re.IGNORECASE)
     if match:
         return match.group(1)
 
-    match = re.search(r'surveyPeriodId=([a-f0-9\-]{36})', raw_curl_content, re.IGNORECASE)
+    match = re.search(r'surveyPeriodId=([a-f0-9\\-]{36})', raw_curl_content, re.IGNORECASE)
     if match:
         return match.group(1)
 
@@ -121,7 +121,7 @@ def extract_survey_period_id(parsed_curl, raw_curl_content=""):
 
 def main():
     print("=" * 60)
-    print("           BULK APPROVAL AUTOMATION SCRIPT")
+    print("           BULK REJECT AUTOMATION SCRIPT")
     print("=" * 60)
 
     print("[*] Membaca perintah cURL dari curl.txt...")
@@ -130,7 +130,7 @@ def main():
             curl_content = f.read().strip()
     except FileNotFoundError:
         print("[!] File curl.txt tidak ditemukan!")
-        print("    Silakan buat file 'approve/curl.txt' dan tempel perintah cURL DataTables dari browser.")
+        print("    Silakan buat file 'reject/curl.txt' dan tempel perintah cURL DataTables dari browser.")
         return
 
     commands = split_curl_commands(curl_content)
@@ -168,7 +168,7 @@ def main():
 
     # Jika terjadi pergantian kegiatan survei, reset list ID lama
     if survey_period_id and prev_period_id and prev_period_id != survey_period_id:
-        print(f"\n🔄 Terdeteksi pergantian kegiatan survei.")
+        print(f"\\n🔄 Terdeteksi pergantian kegiatan survei.")
         print(f"   - Periode Baru : {survey_period_id}")
         print(f"   - Periode Lama : {prev_period_id}")
         print("   Mereset cache list ID lama (ids.json)...")
@@ -213,7 +213,7 @@ def main():
 
     all_ids = []
 
-    print("\n[?] Pilih sumber ID untuk diproses:")
+    print("\\n[?] Pilih sumber ID untuk diproses (REJECT):")
     print("1. Ambil dari API DataTables (otomatis semua hasil dari curl)")
     print("2. Gunakan ID dari berkas ids.json (cache/sebelumnya)")
     print("3. Baca dari berkas id_spesifik.txt (satu ID per baris)")
@@ -248,7 +248,7 @@ def main():
             return
             
     elif pilihan == '4':
-        ids_input = input("Masukkan ID (pisahkan dengan koma jika lebih dari satu):\n> ").strip()
+        ids_input = input("Masukkan ID (pisahkan dengan koma jika lebih dari satu):\\n> ").strip()
         all_ids = [i.strip() for i in ids_input.split(',') if i.strip()]
         print(f" -> Memperoleh {len(all_ids)} ID dari input manual.")
         if not all_ids:
@@ -256,7 +256,7 @@ def main():
             return
 
     else:
-        print("\n[*] Menjalankan alur pengambilan data ID assignment dari API DataTables...")
+        print("\\n[*] Menjalankan alur pengambilan data ID assignment dari API DataTables...")
         start = base_payload.get('start', 0)
         length = base_payload.get('length', 100)
         if length <= 0:
@@ -317,32 +317,32 @@ def main():
             ids_to_save = [{"id": item_id} for item_id in all_ids]
             with open('ids.json', 'w', encoding='utf-8') as f:
                 json.dump(ids_to_save, f, indent=2)
-            print(f"\n[*] Berhasil menyimpan {len(all_ids)} ID ke berkas ids.json.")
+            print(f"\\n[*] Berhasil menyimpan {len(all_ids)} ID ke berkas ids.json.")
         else:
             print("[!] Tidak ada ID yang ditemukan dari API DataTables.")
             return
 
     if not all_ids:
-        print("[!] Tidak ada ID yang akan diproses untuk approval.")
+        print("[!] Tidak ada ID yang akan diproses untuk reject.")
         return
 
-    print(f"\n[?] Siap melakukan approval massal untuk {len(all_ids)} assignment.")
-    confirm = input(f"Apakah Anda yakin ingin menyetujui (approve) {len(all_ids)} assignment ini? (Y/n): ").strip().lower()
+    print(f"\\n[?] Siap melakukan reject massal untuk {len(all_ids)} assignment.")
+    confirm = input(f"Apakah Anda yakin ingin menolak (reject) {len(all_ids)} assignment ini? (Y/n): ").strip().lower()
     if confirm == 'n':
         print("[*] Dibatalkan oleh pengguna.")
         return
 
-    # Sesuai Endpoint user terbaru atau default (coba pakai yg dari curl user: /app/api/assignment-approval/api/v2/approval atau biarkan default sebelumnya)
-    url_approval = "https://fasih-sm.bps.go.id/app/api/assignment-approval/api/v2/approval"
+    # Sesuai Endpoint reject
+    url_reject = "https://fasih-sm.bps.go.id/app/api/assignment-approval/api/v2/approval"
     timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_file = "execution.log"
 
     with open(log_file, "a", encoding="utf-8") as lf:
-        lf.write(f"\n==================================================\n")
-        lf.write(f"EKSEKUSI APPROVE: {timestamp_str}\n")
-        lf.write(f"==================================================\n")
+        lf.write(f"\\n==================================================\\n")
+        lf.write(f"EKSEKUSI REJECT: {timestamp_str}\\n")
+        lf.write(f"==================================================\\n")
 
-    print(f"\n[*] Memulai proses approval untuk {len(all_ids)} ID...\n")
+    print(f"\\n[*] Memulai proses reject untuk {len(all_ids)} ID...\\n")
     print("-" * 40)
 
     total_success = 0
@@ -353,30 +353,28 @@ def main():
         log_msg = f"[{idx+1}/{len(all_ids)}] Memproses ID: {assignment_id}"
         print(log_msg)
         with open(log_file, "a", encoding="utf-8") as lf:
-            lf.write(log_msg + "\n")
+            lf.write(log_msg + "\\n")
 
-        # Approval endpoint requires Content-Type: application/json in the new curl format provided by user, 
-        # but let's send it as multipart just in case, unless we want to change it to JSON. 
-        # Wait, I will keep multipart for approve because it was written like that before, 
-        # or change it to JSON based on user's new reject curl.
-        # Let's use JSON payload for approve as well to be consistent.
+        # Payload for reject requires statusApproval = "false"
         payload = {
             "assignmentId": assignment_id,
-            "statusApproval": "true",
+            "statusApproval": "false",
             "comment": "{\"dataKey\":\"\",\"notes\":[]}"
         }
         
         try:
-            response = requests.post(url_approval, headers=headers_json, json=payload, timeout=15)
+            # Send as JSON (application/json) which is standard for the reject endpoint based on user curl
+            response = requests.post(url_reject, headers=headers_json, json=payload, timeout=15)
+            
             # fallback ke cara lama jika error 415/400?
             if response.status_code not in (200, 201):
                 # coba pakai multipart/form-data
                 multipart_data = {
                     'assignmentId': (None, assignment_id),
-                    'statusApproval': (None, 'true'),
+                    'statusApproval': (None, 'false'),
                     'comment': (None, '{"dataKey":"","notes":[]}')
                 }
-                response = requests.post(url_approval, headers=headers_approval, files=multipart_data, timeout=15)
+                response = requests.post(url_reject, headers=headers_approval, files=multipart_data, timeout=15)
 
             if response.status_code in (200, 201):
                 msg = f" -> [SUKSES] Status HTTP: {response.status_code}"
@@ -389,19 +387,19 @@ def main():
                 failed_details.append({"id": assignment_id, "reason": f"Status HTTP {response.status_code}"})
 
             with open(log_file, "a", encoding="utf-8") as lf:
-                lf.write(msg + "\n")
+                lf.write(msg + "\\n")
 
             try:
                 parsed_response = response.json()
                 resp_msg = f" -> Response Status: {parsed_response.get('message')} | Data: {parsed_response.get('data')}"
                 print(resp_msg)
                 with open(log_file, "a", encoding="utf-8") as lf:
-                    lf.write(resp_msg + "\n")
+                    lf.write(resp_msg + "\\n")
             except Exception:
                 resp_msg = f" -> Response: {response.text[:200]}"
                 print(resp_msg)
                 with open(log_file, "a", encoding="utf-8") as lf:
-                    lf.write(resp_msg + "\n")
+                    lf.write(resp_msg + "\\n")
 
             print("-" * 40)
 
@@ -409,17 +407,17 @@ def main():
             msg = f" -> [ERROR] Request gagal: {e}"
             print(msg)
             with open(log_file, "a", encoding="utf-8") as lf:
-                lf.write(msg + "\n")
+                lf.write(msg + "\\n")
             total_failed += 1
             failed_details.append({"id": assignment_id, "reason": f"RequestException: {e}"})
             print("-" * 40)
 
     summary_lines = []
-    summary_lines.append("\n" + "=" * 50)
-    summary_lines.append("           RINGKASAN AKHIR PENGEKSEKUSIAN")
+    summary_lines.append("\\n" + "=" * 50)
+    summary_lines.append("           RINGKASAN AKHIR PENGEKSEKUSIAN (REJECT)")
     summary_lines.append("=" * 50)
-    summary_lines.append(f" - Berhasil diproses : {total_success}")
-    summary_lines.append(f" - Gagal diproses    : {total_failed}")
+    summary_lines.append(f" - Berhasil direject : {total_success}")
+    summary_lines.append(f" - Gagal direject    : {total_failed}")
     summary_lines.append(f" - Total target      : {len(all_ids)}")
     summary_lines.append("=" * 50)
 
@@ -429,10 +427,10 @@ def main():
             summary_lines.append(f" - ID: {fd['id']} (Alasan: {fd['reason']})")
         summary_lines.append("=" * 50)
 
-    summary_text = "\n".join(summary_lines)
+    summary_text = "\\n".join(summary_lines)
     print(summary_text)
     with open(log_file, "a", encoding="utf-8") as lf:
-        lf.write(summary_text + "\n")
+        lf.write(summary_text + "\\n")
 
 if __name__ == "__main__":
     main()

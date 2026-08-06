@@ -22,6 +22,13 @@ Proyek ini telah direstrukturisasi sehingga semua skrip di dalam sub-folder berf
 │   ├── config.json          # Konfigurasi surveyPeriodId aktif
 │   └── ids.json             # Database target ID modul (auto-generated / disunting manual)
 │
+├── reject/                  # Modul: Bulk Reject Penugasan
+│   ├── __init__.py
+│   ├── hit_endpoint.py      # Kode utama modul
+│   ├── curl.txt             # Salinan cURL datatable penugasan
+│   ├── ids.json             # Cache daftar ID target
+│   └── config.json          # Konfigurasi surveyPeriodId
+│
 ├── clear-assignment/        # Modul: Clear Assignment massal via email
 │   ├── __init__.py
 │   ├── hit_endpoint.py
@@ -96,6 +103,7 @@ Anda akan disajikan menu interaktif untuk memilih modul mana yang ingin diekseku
 Tentukan nama modul sebagai argumen baris perintah pertama:
 ```bash
 python main.py approve
+python main.py reject
 python main.py clear-assignment
 python main.py clear-petugas
 python main.py assign
@@ -111,6 +119,7 @@ python main.py help <nama_modul>
 Contoh perintah bantuan yang tersedia:
 ```bash
 python main.py help approve
+python main.py help reject
 python main.py help clear-assignment
 python main.py help clear-petugas
 python main.py help assign
@@ -209,6 +218,7 @@ Setiap modul dilengkapi dengan sistem pencatatan log otomatis untuk memantau riw
 ## Dokumentasi Detail Sub-Proyek
 Untuk melihat instruksi spesifik cara mendapatkan token cURL dan detail teknis masing-masing modul:
 * **[Dokumentasi Modul Approve](approve/README.md)**
+* **[Dokumentasi Modul Reject](reject/README.md)**
 * **[Dokumentasi Modul Clear Assignment](clear-assignment/README.md)**
 * **[Dokumentasi Modul Clear Petugas](clear-petugas/README.md)**
 * **[Dokumentasi Modul Assign](assign/README.md)**

@@ -34,6 +34,11 @@ MODULES = {
         "name": "rekap",
         "title": "Rekap (Rekap Progress Petugas Pencacah & Pengawas)",
         "desc": "Mengambil data rekap progress masing-masing petugas pencacah (PPL) dan pengawas (PML) berdasarkan email."
+    },
+    "7": {
+        "name": "reject",
+        "title": "Reject (Bulk Reject Penugasan)",
+        "desc": "Menarik ID (atau via input manual) dan melakukan reject (penolakan) massal."
     }
 }
 
@@ -83,6 +88,13 @@ HELP_STEPS = {
         "5. Siapkan file Excel daftar petugas di: rekap/rekap.xlsx",
         "   Format: Sheet pertama, Kolom E=Nama Mitra, Kolom F=Email Mitra, Kolom D=PML (untuk pengawas).",
         "6. Jalankan script. Jika session habis, update curl.txt dengan cURL baru dan jalankan ulang (otomatis resume)."
+    ],
+    "reject": [
+        "1. Login ke website FASIH BPS di browser Anda.",
+        "2. Tekan F12 untuk membuka Developer Tools, lalu pilih tab 'Network'.",
+        "3. (Opsional jika ambil via DataTables) Cari request DataTables penugasan, copy as cURL (bash) dan paste ke: reject/curl.txt",
+        "4. (Opsional) Buat berkas id_spesifik.txt berisi daftar ID (satu ID per baris) jika ingin reject spesifik.",
+        "5. Jalankan script. Pilih mode pengambilan ID dari menu interaktif lalu konfirmasi proses reject massal."
     ]
 }
 
@@ -110,7 +122,7 @@ def show_help(target_name=None):
                 print(f" {key}. {info['title']}")
             print(" q. Kembali ke menu utama")
             print("-" * 60)
-            choice = input("Masukkan pilihan bantuan (1/2/3/4/5/q): ").strip().lower()
+            choice = input("Masukkan pilihan bantuan (1/2/3/4/5/6/7/q): ").strip().lower()
             if choice == 'q':
                 break
             elif choice in MODULES:
@@ -164,7 +176,7 @@ def show_menu():
     print(" q. Keluar")
     print("-" * 60)
     
-    choice = input("Masukkan pilihan Anda (1/2/3/4/5/6/h/q): ").strip().lower()
+    choice = input("Masukkan pilihan Anda (1/2/3/4/5/6/7/h/q): ").strip().lower()
     if choice == 'q':
         print("[*] Selesai.")
         sys.exit(0)
