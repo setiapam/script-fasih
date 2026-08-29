@@ -21,6 +21,33 @@ TARGET_FILE = "subsls_target.xlsx"
 LOG_FILE = "execution.log"
 REQUEST_DELAY = 0.3  # Delay antar request (detik) untuk menghindari rate-limit
 
+def is_session_expired_response(response):
+    """Mendeteksi apakah response menandakan sesi login / cURL sudah kadaluarsa."""
+    if response.status_code in (401, 403, 405):
+        return True
+    content_type = response.headers.get('Content-Type', '')
+    if 'text/html' in content_type:
+        text_lower = response.text.lower()
+        if 'login' in text_lower or 'keycloak' in text_lower or 'sso' in text_lower or 'unauthorized' in text_lower:
+            return True
+    return False
+
+def show_session_expired_banner(module_curl_path="tarik-data/curl.txt", completed_count=0, total_count=0):
+    """Menampilkan banner instruksi yang jelas saat sesi expired agar pengguna tidak salah paham."""
+    print("\n" + "=" * 65)
+    print("⚠️  [SESI LOGIN KADALUARSA / EXPIRED] (HTTP 401/403/405)")
+    print("=" * 65)
+    print(" Sesi login FASIH BPS atau token cURL Anda telah habis masa berlakunya.")
+    print(" BUKAN karena data tidak ada di server, melainkan akses ditolak.")
+    print("\n Langkah mudah untuk melanjutkan:")
+    print("  1. Buka browser dan login ulang ke https://fasih-sm.bps.go.id")
+    print("  2. Buka tab Network (F12), lakukan interaksi/refresh halaman.")
+    print(f"  3. Salin (Copy as cURL) request terbaru ke berkas: {module_curl_path}")
+    print("  4. Jalankan ulang script (semua progress yang berhasil tersimpan otomatis).")
+    if total_count > 0:
+        print(f"\n Progress saat ini: {completed_count} dari {total_count} target selesai.")
+    print("=" * 65 + "\n")
+
 
 # ============================================================
 #  CURL PARSER
@@ -320,14 +347,10 @@ def fetch_data_for_subsls(headers, base_payload, region_ids):
         payload['start'] = start
         try:
             response = requests.post(DATA_URL, headers=headers, json=payload)
+            if is_session_expired_response(response):
+                return None, "SESSION_EXPIRED"
             if response.status_code != 200:
-                if response.status_code == 405:
-                    return None, "HTTP 405 (Sesi cURL Kedaluwarsa / Method Not Allowed - Silakan perbarui tarik-data/curl.txt)"
                 return None, f"HTTP {response.status_code}"
-
-            content_type = response.headers.get('Content-Type', '')
-            if 'text/html' in content_type or response.text.strip().startswith('<'):
-                return None, "Sesi cURL kedaluwarsa (Session Expired / Redirect ke Login)"
 
             res_json = response.json()
             data_list = res_json.get('data') or res_json.get('searchData') or []
@@ -777,7 +800,14 @@ def main():
             try:
                 records, error = fetch_data_for_subsls(headers, base_payload, region_ids)
 
-                if error:
+                if error == "SESSION_EXPIRED":
+                    msg = " -> [ERROR AUTH] Sesi cURL / login FASIH BPS telah kadaluarsa."
+                    print(msg)
+                    with open(LOG_FILE, "a", encoding="utf-8") as lf:
+                        lf.write(msg + "\n")
+                    show_session_expired_banner(module_curl_path="tarik-data/curl.txt", completed_count=total_success, total_count=len(valid_targets))
+                    break
+                elif error:
                     msg = f" -> [GAGAL] {error}"
                     print(msg)
                     total_failed += 1

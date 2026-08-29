@@ -3,6 +3,8 @@ import pandas as pd
 import re
 import time
 import os
+import json
+import sys
 
 # ================= KONFIGURASI =================
 EXCEL_FILE = 'assign.xlsx'
@@ -16,7 +18,37 @@ FILE_CURL_PML = 'curl_pengawas.txt'
 FILE_CURL_SAMPEL = 'curl_sampel.txt'
 FILE_CURL_ASSIGN = 'curl_assign.txt'
 
+class SessionExpiredException(Exception):
+    pass
+
 # ================= FUNGSI BANTUAN =================
+
+def is_session_expired_response(response):
+    """Mendeteksi apakah response menandakan sesi login / cURL sudah kadaluarsa."""
+    if response.status_code in (401, 403):
+        return True
+    content_type = response.headers.get('Content-Type', '')
+    if 'text/html' in content_type:
+        text_lower = response.text.lower()
+        if 'login' in text_lower or 'keycloak' in text_lower or 'sso' in text_lower or 'unauthorized' in text_lower:
+            return True
+    return False
+
+def show_session_expired_banner(module_curl_path="assign/curl.txt", completed_count=0, total_count=0):
+    """Menampilkan banner instruksi yang jelas saat sesi expired agar pengguna tidak salah paham."""
+    print("\n" + "=" * 65)
+    print("⚠️  [SESI LOGIN KADALUARSA / EXPIRED] (HTTP 401/403)")
+    print("=" * 65)
+    print(" Sesi login FASIH BPS atau token cURL Anda telah habis masa berlakunya.")
+    print(" BUKAN karena data/petugas tidak ada di server, melainkan akses ditolak.")
+    print("\n Langkah mudah untuk melanjutkan:")
+    print("  1. Buka browser dan login ulang ke https://fasih-sm.bps.go.id")
+    print("  2. Buka tab Network (F12), lakukan interaksi/refresh halaman.")
+    print(f"  3. Salin (Copy as cURL) request terbaru ke berkas: {module_curl_path}")
+    print("  4. Jalankan ulang script (semua progress yang berhasil tersimpan otomatis).")
+    if total_count > 0:
+        print(f"\n Progress saat ini: {completed_count} dari {total_count} target selesai.")
+    print("=" * 65 + "\n")
 
 def normalize_email(email):
     if not email:
@@ -126,6 +158,8 @@ def fetch_all_users(url, headers, role_name):
         ))
         
         response = requests.get(new_url, headers=headers)
+        if is_session_expired_response(response):
+            raise SessionExpiredException(f"Sesi login kadaluarsa saat mengambil data {role_name} (HTTP {response.status_code}).")
         if response.status_code != 200: break
         try: json_response = response.json()
         except requests.exceptions.JSONDecodeError: break
@@ -185,6 +219,8 @@ def fetch_all_samples(url, headers, survey_period_id):
         }
         
         response = requests.post(url, headers=headers, json=payload)
+        if is_session_expired_response(response):
+            raise SessionExpiredException(f"Sesi login kadaluarsa saat mengambil data sampel (HTTP {response.status_code}).")
         if response.status_code != 200: break
         try: json_response = response.json()
         except requests.exceptions.JSONDecodeError: break
@@ -198,7 +234,7 @@ def fetch_all_samples(url, headers, survey_period_id):
             sample_id = item.get('id')
             if not sample_id: continue
                 
-            for key in ['codeIdentity', 'data1', 'data2', 'data3', 'data4', 'data5']:
+            for key in ['codeIdentity'] + [f'data{i}' for i in range(1, 16)]:
                 val = str(item.get(key, '')).strip()
                 if val.endswith('.0'): val = val[:-2]
                 if val and val.lower() != 'none':
@@ -242,13 +278,15 @@ def fetch_single_sample_on_demand(url, headers, survey_period_id, keyword, targe
     for attempt in range(3):
         try:
             response = requests.post(url, headers=headers, json=payload, timeout=10)
+            if is_session_expired_response(response):
+                raise SessionExpiredException(f"Sesi login kadaluarsa saat mencari sampel {keyword} (HTTP {response.status_code}).")
             if response.status_code == 200:
                 data = extract_list_from_json(response.json())
                 for item in data:
                     if not isinstance(item, dict): continue
                     
                     # Double-Check: Apakah di antara baris hasil pencarian ini ada IDSBR target kita?
-                    for key in ['codeIdentity', 'data1', 'data2', 'data3', 'data4', 'data5']:
+                    for key in ['codeIdentity'] + [f'data{i}' for i in range(1, 16)]:
                         val = str(item.get(key, '')).strip()
                         if val.endswith('.0'): val = val[:-2]
                         
@@ -259,6 +297,8 @@ def fetch_single_sample_on_demand(url, headers, survey_period_id, keyword, targe
                 time.sleep(2.0 * (attempt + 1))
             else:
                 break
+        except SessionExpiredException:
+            raise
         except Exception:
             time.sleep(1.0)
         
@@ -276,6 +316,8 @@ def fetch_single_user_on_demand(headers, survey_period_id, email):
     for attempt in range(2):
         try:
             response = requests.get(url, headers=headers, timeout=10)
+            if is_session_expired_response(response):
+                raise SessionExpiredException(f"Sesi login kadaluarsa saat mencari user {email} (HTTP {response.status_code}).")
             if response.status_code == 200:
                 json_resp = response.json()
                 data = extract_list_from_json(json_resp)
@@ -292,6 +334,8 @@ def fetch_single_user_on_demand(headers, survey_period_id, email):
                         if alloc_id:
                             return alloc_id
                 break
+        except SessionExpiredException:
+            raise
         except Exception:
             time.sleep(0.5)
     return None
@@ -393,9 +437,14 @@ def main():
         pass
 
     # 1. Tarik Kamus Data Cache
-    dict_pencacah = fetch_all_users(url_pcl, headers_pcl, "Pencacah")
-    dict_pengawas = fetch_all_users(url_pml, headers_pml, "Pengawas")
-    dict_sampel = fetch_all_samples(url_sampel, headers_sampel, survey_period_id)
+    try:
+        dict_pencacah = fetch_all_users(url_pcl, headers_pcl, "Pencacah")
+        dict_pengawas = fetch_all_users(url_pml, headers_pml, "Pengawas")
+        dict_sampel = fetch_all_samples(url_sampel, headers_sampel, survey_period_id)
+    except SessionExpiredException as e:
+        print(f"\n[!] {e}")
+        show_session_expired_banner(module_curl_path="assign/curl.txt")
+        return
     
     # Muat dari CSV cache jika ada
     def load_dict_from_csv(filename):
@@ -527,36 +576,43 @@ def main():
         sample_id = dict_sampel.get(sampel_excel)
         
         # JIKA GAGAL DITEMUKAN DI CACHE: Lakukan Pencarian On-Demand
-        if not sample_id:
-            # 1. Utamakan pencarian presisi berdasarkan angka IDSBR
-            f_msg = f"🔍 [Pencarian IDSBR] Mencari sampel ke server berdasarkan IDSBR: {sampel_excel}..."
-            print(f_msg)
-            with open(log_file, "a", encoding="utf-8") as lf:
-                lf.write(f_msg + "\n")
-            sample_id = fetch_single_sample_on_demand(url_sampel, headers_sampel, survey_period_id, keyword=sampel_excel, target_idsbr=sampel_excel)
-            
-            # 2. Jika IDSBR tidak ketemu, Fallback cari berdasarkan Nama Perusahaan
-            if not sample_id and nama_perusahaan:
-                p_msg = f"🔍 [Pencarian Perusahaan] Fallback mencari berdasarkan Nama Perusahaan: '{nama_perusahaan}'..."
-                print(p_msg)
+        try:
+            if not sample_id:
+                # 1. Utamakan pencarian presisi berdasarkan angka IDSBR
+                f_msg = f"🔍 [Pencarian IDSBR] Mencari sampel ke server berdasarkan IDSBR: {sampel_excel}..."
+                print(f_msg)
                 with open(log_file, "a", encoding="utf-8") as lf:
-                    lf.write(p_msg + "\n")
-                sample_id = fetch_single_sample_on_demand(url_sampel, headers_sampel, survey_period_id, keyword=nama_perusahaan, target_idsbr=sampel_excel)
+                    lf.write(f_msg + "\n")
+                sample_id = fetch_single_sample_on_demand(url_sampel, headers_sampel, survey_period_id, keyword=sampel_excel, target_idsbr=sampel_excel)
+                
+                # 2. Jika IDSBR tidak ketemu, Fallback cari berdasarkan Nama Perusahaan
+                if not sample_id and nama_perusahaan:
+                    p_msg = f"🔍 [Pencarian Perusahaan] Fallback mencari berdasarkan Nama Perusahaan: '{nama_perusahaan}'..."
+                    print(p_msg)
+                    with open(log_file, "a", encoding="utf-8") as lf:
+                        lf.write(p_msg + "\n")
+                    sample_id = fetch_single_sample_on_demand(url_sampel, headers_sampel, survey_period_id, keyword=nama_perusahaan, target_idsbr=sampel_excel)
 
-            if sample_id:
-                dict_sampel[sampel_excel] = sample_id # Simpan hasil yang baru ketemu
-            
-        pcl_id = dict_pencacah.get(email_pcl)
-        if not pcl_id and email_pcl:
-            pcl_id = fetch_single_user_on_demand(headers_pcl, survey_period_id, email_pcl)
-            if pcl_id:
-                dict_pencacah[email_pcl] = pcl_id
+                if sample_id:
+                    dict_sampel[sampel_excel] = sample_id # Simpan hasil yang baru ketemu
+                
+            pcl_id = dict_pencacah.get(email_pcl)
+            if not pcl_id and email_pcl:
+                pcl_id = fetch_single_user_on_demand(headers_pcl, survey_period_id, email_pcl)
+                if pcl_id:
+                    dict_pencacah[email_pcl] = pcl_id
 
-        pml_id = dict_pengawas.get(email_pml)
-        if not pml_id and email_pml:
-            pml_id = fetch_single_user_on_demand(headers_pml, survey_period_id, email_pml)
-            if pml_id:
-                dict_pengawas[email_pml] = pml_id
+            pml_id = dict_pengawas.get(email_pml)
+            if not pml_id and email_pml:
+                pml_id = fetch_single_user_on_demand(headers_pml, survey_period_id, email_pml)
+                if pml_id:
+                    dict_pengawas[email_pml] = pml_id
+        except SessionExpiredException as e:
+            print(f" -> [ERROR AUTH] {e}")
+            with open(log_file, "a", encoding="utf-8") as lf:
+                lf.write(f" -> [ERROR AUTH] {e}\n")
+            show_session_expired_banner(module_curl_path="assign/curl.txt", completed_count=sukses, total_count=len(df))
+            break
         
         if not sample_id:
             msg = f" -> [GAGAL] Lewati {sampel_excel}: Sampel tidak ditemukan meski sudah dicari manual."
@@ -598,6 +654,14 @@ def main():
         
         try:
             assign_req = requests.post(url_assign, headers=headers_assign, json=assign_payload, timeout=15)
+            if is_session_expired_response(assign_req):
+                msg = f" -> [ERROR AUTH] Sesi kadaluarsa saat meng-assign {sampel_excel} (HTTP {assign_req.status_code})."
+                print(msg)
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    lf.write(msg + "\n")
+                show_session_expired_banner(module_curl_path="assign/curl.txt", completed_count=sukses, total_count=len(df))
+                break
+                
             if assign_req.status_code in [200, 201]:
                 msg = f" -> [SUKSES] Berhasil Assign - {sampel_excel} | PCL: {email_pcl}, PML: {email_pml} (Status: {assign_req.status_code})"
                 print(msg)

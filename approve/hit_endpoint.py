@@ -4,6 +4,34 @@ import re
 import requests
 import datetime
 import os
+import sys
+
+def is_session_expired_response(response):
+    """Mendeteksi apakah response menandakan sesi login / cURL sudah kadaluarsa."""
+    if response.status_code in (401, 403):
+        return True
+    content_type = response.headers.get('Content-Type', '')
+    if 'text/html' in content_type:
+        text_lower = response.text.lower()
+        if 'login' in text_lower or 'keycloak' in text_lower or 'sso' in text_lower or 'unauthorized' in text_lower:
+            return True
+    return False
+
+def show_session_expired_banner(module_curl_path="approve/curl.txt", completed_count=0, total_count=0):
+    """Menampilkan banner instruksi yang jelas saat sesi expired agar pengguna tidak salah paham."""
+    print("\n" + "=" * 65)
+    print("⚠️  [SESI LOGIN KADALUARSA / EXPIRED] (HTTP 401/403)")
+    print("=" * 65)
+    print(" Sesi login FASIH BPS atau token cURL Anda telah habis masa berlakunya.")
+    print(" BUKAN karena data tidak ada di server, melainkan akses ditolak.")
+    print("\n Langkah mudah untuk melanjutkan:")
+    print("  1. Buka browser dan login ulang ke https://fasih-sm.bps.go.id")
+    print("  2. Buka tab Network (F12), lakukan interaksi/refresh halaman.")
+    print(f"  3. Salin (Copy as cURL) request terbaru ke berkas: {module_curl_path}")
+    print("  4. Jalankan ulang script (semua progress yang berhasil tersimpan otomatis).")
+    if total_count > 0:
+        print(f"\n Progress saat ini: {completed_count} dari {total_count} target selesai.")
+    print("=" * 65 + "\n")
 
 def parse_curl(curl_command):
     """
@@ -278,6 +306,10 @@ def main():
                     json=base_payload,
                     timeout=30
                 )
+                if is_session_expired_response(response):
+                    print(f"\n[!] Sesi login kadaluarsa saat mengambil data DataTables (HTTP {response.status_code}).")
+                    show_session_expired_banner("approve/curl.txt")
+                    return
                 response.raise_for_status()
                 res_json = response.json()
             except Exception as e:
@@ -369,7 +401,7 @@ def main():
         try:
             response = requests.post(url_approval, headers=headers_json, json=payload, timeout=15)
             # fallback ke cara lama jika error 415/400?
-            if response.status_code not in (200, 201):
+            if response.status_code not in (200, 201) and not is_session_expired_response(response):
                 # coba pakai multipart/form-data
                 multipart_data = {
                     'assignmentId': (None, assignment_id),
@@ -377,6 +409,14 @@ def main():
                     'comment': (None, '{"dataKey":"","notes":[]}')
                 }
                 response = requests.post(url_approval, headers=headers_approval, files=multipart_data, timeout=15)
+
+            if is_session_expired_response(response):
+                msg = f" -> [ERROR AUTH] Sesi login kadaluarsa saat approve ID {assignment_id} (HTTP {response.status_code})."
+                print(msg)
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    lf.write(msg + "\n")
+                show_session_expired_banner(module_curl_path="approve/curl.txt", completed_count=total_success, total_count=len(all_ids))
+                break
 
             if response.status_code in (200, 201):
                 msg = f" -> [SUKSES] Status HTTP: {response.status_code}"

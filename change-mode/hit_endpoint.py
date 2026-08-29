@@ -5,6 +5,7 @@ import time
 import os
 import json
 import datetime
+import sys
 
 # ================= KONFIGURASI =================
 DEFAULT_EXCEL_FILES = ['change_mode.xlsx', 'change-mode.xlsx', 'mode.xlsx', 'assign.xlsx']
@@ -14,7 +15,37 @@ KOLOM_MODE_DEFAULT = 'mode'
 
 VALID_MODES = {'PAPI', 'CAPI', 'CAWI'}
 
+class SessionExpiredException(Exception):
+    pass
+
 # ================= FUNGSI BANTUAN =================
+
+def is_session_expired_response(response):
+    """Mendeteksi apakah response menandakan sesi login / cURL sudah kadaluarsa."""
+    if response.status_code in (401, 403):
+        return True
+    content_type = response.headers.get('Content-Type', '')
+    if 'text/html' in content_type:
+        text_lower = response.text.lower()
+        if 'login' in text_lower or 'keycloak' in text_lower or 'sso' in text_lower or 'unauthorized' in text_lower:
+            return True
+    return False
+
+def show_session_expired_banner(module_curl_path="change-mode/curl.txt", completed_count=0, total_count=0):
+    """Menampilkan banner instruksi yang jelas saat sesi expired agar pengguna tidak salah paham."""
+    print("\n" + "=" * 65)
+    print("⚠️  [SESI LOGIN KADALUARSA / EXPIRED] (HTTP 401/403)")
+    print("=" * 65)
+    print(" Sesi login FASIH BPS atau token cURL Anda telah habis masa berlakunya.")
+    print(" BUKAN karena data tidak ada di server BPS, melainkan akses ditolak.")
+    print("\n Langkah mudah untuk melanjutkan:")
+    print("  1. Buka browser dan login ulang ke https://fasih-sm.bps.go.id")
+    print("  2. Buka tab Network (F12), lakukan interaksi/refresh halaman.")
+    print(f"  3. Salin (Copy as cURL) request terbaru ke berkas: {module_curl_path}")
+    print("  4. Jalankan ulang script (semua progress yang berhasil tersimpan otomatis).")
+    if total_count > 0:
+        print(f"\n Progress saat ini: {completed_count} dari {total_count} target selesai.")
+    print("=" * 65 + "\n")
 
 def parse_curl(filepath):
     """Membaca file cURL dan mengekstrak URL, Cookie, XSRF token, dan Header lainnya."""
@@ -138,7 +169,7 @@ def check_item_contains_value(item, target_value):
     return False
 
 def query_datatable(url, headers, survey_period_id, search_term, extra_filter=False):
-    """Mengirim request pencarian langsung ke DataTables API."""
+    """Mengirim request pencarian langsung ke DataTables API dengan deteksi session expired."""
     extra_param = {"surveyPeriodId": survey_period_id}
     if extra_filter:
         extra_param["filterTargetType"] = "TARGET_ONLY"
@@ -174,12 +205,18 @@ def query_datatable(url, headers, survey_period_id, search_term, extra_filter=Fa
     for attempt in range(2):
         try:
             response = requests.post(url, headers=headers, json=payload, timeout=20)
+            
+            if is_session_expired_response(response):
+                raise SessionExpiredException(f"HTTP {response.status_code}: Sesi login FASIH BPS telah habis masa berlakunya.")
+                
             if response.status_code == 200:
                 return extract_list_from_json(response.json())
             elif response.status_code == 429:
                 time.sleep(1.5 * (attempt + 1))
             else:
                 break
+        except SessionExpiredException:
+            raise
         except Exception:
             time.sleep(0.5)
             
@@ -429,6 +466,7 @@ def main():
     gagal = 0
     log_results = []
     failed_details = []
+    session_expired_detected = False
 
     # Cache runtime per sesi agar jika ada baris excel dengan IDSBR sama tidak mengulang query
     runtime_cache = {}
@@ -492,13 +530,25 @@ def main():
             with open(log_file, "a", encoding="utf-8") as lf:
                 lf.write(s_msg + "\n")
                 
-            sample_id = search_sample_direct(
-                url=url_sampel,
-                headers=headers,
-                survey_period_id=survey_period_id,
-                target_idsbr=sampel_excel,
-                target_perusahaan=nama_perusahaan
-            )
+            try:
+                sample_id = search_sample_direct(
+                    url=url_sampel,
+                    headers=headers,
+                    survey_period_id=survey_period_id,
+                    target_idsbr=sampel_excel,
+                    target_perusahaan=nama_perusahaan
+                )
+            except SessionExpiredException as e:
+                session_expired_detected = True
+                print(f" -> [ERROR AUTH] {e}")
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    lf.write(f" -> [ERROR AUTH] {e}\n")
+                show_session_expired_banner(
+                    module_curl_path="change-mode/curl.txt",
+                    completed_count=sukses,
+                    total_count=len(df)
+                )
+                break
             
             if sample_id:
                 runtime_cache[sampel_excel] = sample_id
@@ -524,6 +574,20 @@ def main():
 
         try:
             response = requests.post(url_change_mode, headers=headers, json=payload, timeout=15)
+            
+            if is_session_expired_response(response):
+                session_expired_detected = True
+                msg = f" -> [ERROR AUTH] Sesi kadaluarsa saat mengubah mode {sampel_excel} (HTTP {response.status_code})."
+                print(msg)
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    lf.write(msg + "\n")
+                show_session_expired_banner(
+                    module_curl_path="change-mode/curl.txt",
+                    completed_count=sukses,
+                    total_count=len(df)
+                )
+                break
+                
             if response.status_code in [200, 201, 204]:
                 msg = f" -> [SUKSES] Berhasil Change Mode -> {sampel_excel} ke mode '{mode_upper}' (Status: {response.status_code})"
                 print(msg)

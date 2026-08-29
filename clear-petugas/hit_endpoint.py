@@ -3,6 +3,34 @@ import shlex
 import re
 import requests
 from urllib.parse import urlparse, parse_qs
+import sys
+
+def is_session_expired_response(response):
+    """Mendeteksi apakah response menandakan sesi login / cURL sudah kadaluarsa."""
+    if response.status_code in (401, 403):
+        return True
+    content_type = response.headers.get('Content-Type', '')
+    if 'text/html' in content_type:
+        text_lower = response.text.lower()
+        if 'login' in text_lower or 'keycloak' in text_lower or 'sso' in text_lower or 'unauthorized' in text_lower:
+            return True
+    return False
+
+def show_session_expired_banner(module_curl_path="clear-petugas/curl.txt", completed_count=0, total_count=0):
+    """Menampilkan banner instruksi yang jelas saat sesi expired agar pengguna tidak salah paham."""
+    print("\n" + "=" * 65)
+    print("⚠️  [SESI LOGIN KADALUARSA / EXPIRED] (HTTP 401/403)")
+    print("=" * 65)
+    print(" Sesi login FASIH BPS atau token cURL Anda telah habis masa berlakunya.")
+    print(" BUKAN karena petugas/alokasi tidak ada di server, melainkan akses ditolak.")
+    print("\n Langkah mudah untuk melanjutkan:")
+    print("  1. Buka browser dan login ulang ke https://fasih-sm.bps.go.id")
+    print("  2. Buka tab Network (F12), lakukan interaksi/refresh halaman.")
+    print(f"  3. Salin (Copy as cURL) request terbaru ke berkas: {module_curl_path}")
+    print("  4. Jalankan ulang script (semua progress yang berhasil tersimpan otomatis).")
+    if total_count > 0:
+        print(f"\n Progress saat ini: {completed_count} dari {total_count} target selesai.")
+    print("=" * 65 + "\n")
 
 def parse_curl(curl_command):
     """
@@ -218,6 +246,10 @@ def main():
             
             try:
                 resp = requests.get(search_url, headers=headers, params=params, timeout=15)
+                if is_session_expired_response(resp):
+                    print(f"\n[!] Sesi login kadaluarsa saat mencari user {email} (HTTP {resp.status_code}).")
+                    show_session_expired_banner("clear-petugas/curl.txt")
+                    return
                 resp.raise_for_status()
                 content = resp.json().get('data', {}).get('content', [])
                 
@@ -243,6 +275,10 @@ def main():
                             'size': size
                         }
                         reg_resp = requests.get(region_url, headers=headers, params=region_params, timeout=15)
+                        if is_session_expired_response(reg_resp):
+                            print(f"\n[!] Sesi login kadaluarsa saat memuat region user {username} (HTTP {reg_resp.status_code}).")
+                            show_session_expired_banner("clear-petugas/curl.txt")
+                            return
                         reg_resp.raise_for_status()
                         
                         reg_data = reg_resp.json().get('data', {})
@@ -353,6 +389,14 @@ def main():
         
         try:
             response = requests.delete(delete_url, headers=headers, params=params, timeout=15)
+            if is_session_expired_response(response):
+                msg = f"[ERROR AUTH] Sesi login kadaluarsa (HTTP {response.status_code})."
+                print(msg)
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    lf.write(msg + "\n")
+                show_session_expired_banner(module_curl_path="clear-petugas/curl.txt", completed_count=total_deleted, total_count=len(all_targets))
+                break
+
             if response.status_code in (200, 201, 204):
                 msg = f"[SUKSES] (Status: {response.status_code})"
                 print(msg)
