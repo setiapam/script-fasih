@@ -105,72 +105,48 @@ def extract_list_from_json(json_data):
         return json_data['data']
     return []
 
-def fetch_all_samples(url, headers, survey_period_id):
-    """Mengambil data sampel awal secara bertahap dari API DataTables."""
-    print("Mengambil data sampel awal (Limit Request: 500 per halaman)...")
-    samples_dict = {}
-    start = 0
-    draw = 1
-    length = 500 
-    total_fetched = 0
-    
-    while True:
-        payload = {
-            "draw": draw,
-            "columns": [{"data": "id", "searchable": True, "orderable": False, "search": {"value": "", "regex": False}}],
-            "order": [{"column": 0, "dir": "asc"}],
-            "start": start,
-            "length": length,
-            "search": {"value": "", "regex": False},
-            "assignmentExtraParam": {"surveyPeriodId": survey_period_id, "filterTargetType": "TARGET_ONLY", "assignmentErrorStatusType": -1}
-        }
+def check_item_contains_value(item, target_value):
+    """Memeriksa secara rekursif apakah target_value ada di dalam atribut apapun dari item."""
+    if not isinstance(item, dict) or not target_value:
+        return False
         
-        try:
-            response = requests.post(url, headers=headers, json=payload, timeout=25)
-            if response.status_code != 200:
-                break
-            json_response = response.json()
-        except Exception:
-            break
-            
-        data = extract_list_from_json(json_response)
-        if not data or len(data) == 0:
-            break
-        total_fetched += len(data)
-            
-        for item in data:
-            if not isinstance(item, dict):
-                continue
-            sample_id = item.get('id')
-            if not sample_id:
-                continue
-                
-            for key in ['codeIdentity', 'data1', 'data2', 'data3', 'data4', 'data5']:
-                val = str(item.get(key, '')).strip()
-                if val.endswith('.0'):
-                    val = val[:-2]
-                if val and val.lower() != 'none':
-                    samples_dict[val] = sample_id
-        
-        print(f"  -> Halaman {draw}: Terambil {len(data)} baris (Total: {total_fetched})")
-        if len(data) < length:
-            break
-        start += length
-        draw += 1
-        time.sleep(0.3)
-        
-    print(f"✅ Selesai mengambil {total_fetched} sampel awal ke dalam memori.")
-    return samples_dict
+    target_str = str(target_value).strip().lower()
+    if target_str.endswith('.0'):
+        target_str = target_str[:-2]
+    if not target_str:
+        return False
 
-def fetch_single_sample_on_demand(url, headers, survey_period_id, keyword, target_idsbr):
-    """Mencari 1 sampel secara spesifik ke server dan memverifikasi dengan IDSBR."""
-    search_term = str(keyword).strip()
-    if not search_term:
-        return None
-    
+    def collect_values(obj):
+        vals = []
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                vals.extend(collect_values(v))
+        elif isinstance(obj, list):
+            for elem in obj:
+                vals.extend(collect_values(elem))
+        elif isinstance(obj, (str, int, float)):
+            s = str(obj).strip().lower()
+            if s.endswith('.0'):
+                s = s[:-2]
+            vals.append(s)
+        return vals
+
+    all_vals = collect_values(item)
+    for v in all_vals:
+        if v == target_str or target_str in v:
+            return True
+    return False
+
+def query_datatable(url, headers, survey_period_id, search_term, extra_filter=False):
+    """Mengirim request pencarian langsung ke DataTables API."""
+    extra_param = {"surveyPeriodId": survey_period_id}
+    if extra_filter:
+        extra_param["filterTargetType"] = "TARGET_ONLY"
+        extra_param["assignmentErrorStatusType"] = -1
+
     payload = {
         "start": 0,
-        "length": 100,
+        "length": 50,
         "columns": [
             {"data": "id", "orderable": True},
             {"data": "codeIdentity", "orderable": True},
@@ -183,38 +159,83 @@ def fetch_single_sample_on_demand(url, headers, survey_period_id, keyword, targe
             {"data": "data7", "orderable": True},
             {"data": "data8", "orderable": True},
             {"data": "data9", "orderable": True},
-            {"data": "data10", "orderable": True}
+            {"data": "data10", "orderable": True},
+            {"data": "data11", "orderable": True},
+            {"data": "data12", "orderable": True},
+            {"data": "data13", "orderable": True},
+            {"data": "data14", "orderable": True},
+            {"data": "data15", "orderable": True}
         ],
         "order": [],
-        "search": {"value": search_term, "regex": False},
-        "assignmentExtraParam": {"surveyPeriodId": survey_period_id, "filterTargetType": "TARGET_ONLY", "assignmentErrorStatusType": -1}
+        "search": {"value": str(search_term).strip(), "regex": False},
+        "assignmentExtraParam": extra_param
     }
-    
-    for attempt in range(3):
+
+    for attempt in range(2):
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=15)
+            response = requests.post(url, headers=headers, json=payload, timeout=20)
             if response.status_code == 200:
-                data = extract_list_from_json(response.json())
-                for item in data:
-                    if not isinstance(item, dict):
-                        continue
-                    
-                    # Double-Check: Apakah di antara baris hasil pencarian ini ada IDSBR target kita?
-                    for key in ['codeIdentity', 'data1', 'data2', 'data3', 'data4', 'data5']:
-                        val = str(item.get(key, '')).strip()
-                        if val.endswith('.0'):
-                            val = val[:-2]
-                        
-                        if val == str(target_idsbr) or str(target_idsbr) in str(item.get('codeIdentity', '')):
-                            return item.get('id')
-                break
+                return extract_list_from_json(response.json())
             elif response.status_code == 429:
-                time.sleep(2.0 * (attempt + 1))
+                time.sleep(1.5 * (attempt + 1))
             else:
                 break
         except Exception:
-            time.sleep(1.0)
-        
+            time.sleep(0.5)
+            
+    return []
+
+def search_sample_direct(url, headers, survey_period_id, target_idsbr, target_perusahaan=""):
+    """
+    Mencari sampel secara LANGSUNG ke server FASIH tanpa mengandalkan bulk cache.
+    Multi-strategi pencarian:
+    1. Pencarian langsung nilai IDSBR (tanpa filter status/tipe sempit).
+    2. Pencarian nilai IDSBR dengan tanda petik ganda (seperti perilaku Web UI BPS).
+    3. Pencarian dengan filter TARGET_ONLY jika diperlukan.
+    4. Fallback pencarian berdasarkan Nama Perusahaan.
+    """
+    idsbr_clean = str(target_idsbr).strip() if target_idsbr else ""
+    if idsbr_clean.endswith('.0'):
+        idsbr_clean = idsbr_clean[:-2]
+
+    # --- TAHAP 1: Cari berdasarkan IDSBR langsung ke server ---
+    if idsbr_clean:
+        # Strategi 1.1: Pencarian umum bebas filter status
+        results = query_datatable(url, headers, survey_period_id, idsbr_clean, extra_filter=False)
+        for item in results:
+            if check_item_contains_value(item, idsbr_clean):
+                return item.get('id')
+            if len(results) == 1 and item.get('id'):
+                return item.get('id')
+
+        # Strategi 1.2: Pencarian exact string quoted seperti web UI (misal: "46377507")
+        results_quoted = query_datatable(url, headers, survey_period_id, f'"{idsbr_clean}"', extra_filter=False)
+        for item in results_quoted:
+            if check_item_contains_value(item, idsbr_clean):
+                return item.get('id')
+            if len(results_quoted) == 1 and item.get('id'):
+                return item.get('id')
+
+        # Strategi 1.3: Coba dengan extra_filter TARGET_ONLY
+        results_filtered = query_datatable(url, headers, survey_period_id, idsbr_clean, extra_filter=True)
+        for item in results_filtered:
+            if check_item_contains_value(item, idsbr_clean):
+                return item.get('id')
+            if len(results_filtered) == 1 and item.get('id'):
+                return item.get('id')
+
+    # --- TAHAP 2: Fallback cari berdasarkan Nama Perusahaan ---
+    nama_clean = str(target_perusahaan).strip() if target_perusahaan else ""
+    if nama_clean and nama_clean.lower() != 'nan':
+        results_nama = query_datatable(url, headers, survey_period_id, nama_clean, extra_filter=False)
+        for item in results_nama:
+            # Utamakan baris yang mengandung IDSBR kita jika ada
+            if idsbr_clean and check_item_contains_value(item, idsbr_clean):
+                return item.get('id')
+            # Atau kecocokan nama perusahaan
+            if check_item_contains_value(item, nama_clean):
+                return item.get('id')
+
     return None
 
 def find_excel_file():
@@ -335,10 +356,7 @@ def main():
 
     print(f"[*] Kolom terdeteksi -> Sampel: '{col_sampel}' | Mode: '{col_mode}' | Perusahaan: '{col_perusahaan or 'TIDAK DITEMUKAN'}'")
 
-    # 2. Tarik Kamus Data Sampel Awal ke Memori
-    dict_sampel = fetch_all_samples(url_sampel, headers, survey_period_id)
-
-    # 3. Checkpoint & Riwayat Progress
+    # 2. Checkpoint & Riwayat Progress
     COMPLETED_FILE = "completed_change_mode.json"
     REPORT_FILE = "laporan_hasil_change_mode.xlsx"
     LEGACY_REPORT_CSV = "laporan_hasil_change_mode.csv"
@@ -398,7 +416,7 @@ def main():
             except Exception:
                 pass
 
-    # 4. Inisialisasi Logging
+    # 3. Inisialisasi Logging
     timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_file = "execution.log"
     
@@ -412,7 +430,10 @@ def main():
     log_results = []
     failed_details = []
 
-    print("\nMemulai proses Change Mode...")
+    # Cache runtime per sesi agar jika ada baris excel dengan IDSBR sama tidak mengulang query
+    runtime_cache = {}
+
+    print("\nMemulai proses Change Mode (Pencarian Langsung On-Demand per Sampel)...")
     print("-" * 50)
 
     for index, row in df.iterrows():
@@ -431,7 +452,7 @@ def main():
         mode_upper = mode_raw.upper()
 
         if sampel_excel in success_set:
-            log_msg = f"Memproses baris {index+1} | IDSBR: {sampel_excel} -> [SKIPPED] Sudah berhasil diubah sebelumnya."
+            log_msg = f"Memproses baris {index+1}/{len(df)} | IDSBR: {sampel_excel} -> [SKIPPED] Sudah berhasil diubah sebelumnya."
             print(log_msg)
             sukses += 1
             log_results.append({
@@ -442,7 +463,7 @@ def main():
             })
             continue
 
-        log_msg = f"Memproses baris {index+1} | IDSBR: {sampel_excel} | Perusahaan: {nama_perusahaan or '-'} | Mode Target: {mode_upper or '-'}"
+        log_msg = f"Memproses baris {index+1}/{len(df)} | IDSBR: {sampel_excel} | Perusahaan: {nama_perusahaan or '-'} | Mode Target: {mode_upper or '-'}"
         print(log_msg)
         with open(log_file, "a", encoding="utf-8") as lf:
             lf.write(log_msg + "\n")
@@ -463,31 +484,27 @@ def main():
                 lf.write(msg + "\n")
             continue
 
-        # Cari ID Sampel dari Cache
-        sample_id = dict_sampel.get(sampel_excel)
-        
-        # JIKA GAGAL DITEMUKAN DI CACHE: Lakukan Pencarian On-Demand
+        # 4. Pencarian Sampel Langsung ke Server
+        sample_id = runtime_cache.get(sampel_excel)
         if not sample_id:
-            # 1. Utamakan pencarian spesifik berdasarkan IDSBR
-            f_msg = f"🔍 [Pencarian IDSBR] Mencari sampel ke server berdasarkan IDSBR: {sampel_excel}..."
-            print(f_msg)
+            s_msg = f"   🔍 Mencari sampel ke server BPS (IDSBR: '{sampel_excel}'" + (f", Perusahaan: '{nama_perusahaan}'" if nama_perusahaan else "") + ")..."
+            print(s_msg)
             with open(log_file, "a", encoding="utf-8") as lf:
-                lf.write(f_msg + "\n")
-            sample_id = fetch_single_sample_on_demand(url_sampel, headers, survey_period_id, keyword=sampel_excel, target_idsbr=sampel_excel)
+                lf.write(s_msg + "\n")
+                
+            sample_id = search_sample_direct(
+                url=url_sampel,
+                headers=headers,
+                survey_period_id=survey_period_id,
+                target_idsbr=sampel_excel,
+                target_perusahaan=nama_perusahaan
+            )
             
-            # 2. Jika IDSBR tidak ketemu, Fallback cari berdasarkan Nama Perusahaan
-            if not sample_id and nama_perusahaan:
-                p_msg = f"🔍 [Pencarian Perusahaan] Fallback mencari berdasarkan Nama Perusahaan: '{nama_perusahaan}'..."
-                print(p_msg)
-                with open(log_file, "a", encoding="utf-8") as lf:
-                    lf.write(p_msg + "\n")
-                sample_id = fetch_single_sample_on_demand(url_sampel, headers, survey_period_id, keyword=nama_perusahaan, target_idsbr=sampel_excel)
-
             if sample_id:
-                dict_sampel[sampel_excel] = sample_id  # Simpan ke cache memori
+                runtime_cache[sampel_excel] = sample_id
 
         if not sample_id:
-            msg = f" -> [GAGAL] Lewati {sampel_excel}: Sampel tidak ditemukan di server meski sudah dicari manual (IDSBR & Nama Perusahaan)."
+            msg = f" -> [GAGAL] Lewati {sampel_excel}: Sampel tidak ditemukan di server FASIH (sudah dicari berdasarkan IDSBR & Nama Perusahaan)."
             print(msg)
             gagal += 1
             log_results.append({
