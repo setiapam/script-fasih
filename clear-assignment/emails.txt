@@ -1,0 +1,2 @@
+petugas1@example.com
+petugas2@example.com
