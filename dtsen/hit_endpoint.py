@@ -426,33 +426,27 @@ def evaluate_dtsen_rules(search_results, target_name="", target_alamat=""):
         return evaluate_single_row_match(search_results[0])
 
     # Kasus > 1 row:
-    # 1. Filter nama sama persis
+    # 1. Filter nama sama persis (100% exact match)
     exact_name_candidates = [
         item for item in search_results
         if is_name_exact_match(target_name, item.get("data1", ""))
     ]
 
-    # 2. Dari kandidat nama sama persis, cek kesamaan alamat (>= 80% / substring)
-    if exact_name_candidates:
-        addr_candidates = [
-            item for item in exact_name_candidates
-            if is_address_similar(target_alamat, item, threshold=0.8)
-        ]
-        if len(addr_candidates) == 1:
-            # Ditemukan tepat 1 baris match kuat setelah filter alamat
-            return evaluate_single_row_match(addr_candidates[0])
+    # 2. Jika tidak ada yang sama persis (0 row match nama), jangan tebak via alamat -> tetap lebih dari 1 row
+    if not exact_name_candidates:
+        return "sdh didata", "ditemukan lebih dari 1 row"
 
-        if len(exact_name_candidates) == 1:
-            # Tepat 1 nama yang sama persis di hasil pencarian
-            return evaluate_single_row_match(exact_name_candidates[0])
-    else:
-        # Jika tidak ada yang sama persis namanya, cek apakah ada 1 yang alamatnya mirip
-        addr_candidates = [
-            item for item in search_results
-            if is_address_similar(target_alamat, item, threshold=0.8)
-        ]
-        if len(addr_candidates) == 1:
-            return evaluate_single_row_match(addr_candidates[0])
+    # 3. Jika tepat 1 nama yang sama persis di hasil pencarian
+    if len(exact_name_candidates) == 1:
+        return evaluate_single_row_match(exact_name_candidates[0])
+
+    # 4. Jika ada > 1 nama yang sama persis (misal 2 orang bernama TAUFIK), cek kemiripan alamat (>= 80%)
+    addr_candidates = [
+        item for item in exact_name_candidates
+        if is_address_similar(target_alamat, item, threshold=0.8)
+    ]
+    if len(addr_candidates) == 1:
+        return evaluate_single_row_match(addr_candidates[0])
 
     return "sdh didata", "ditemukan lebih dari 1 row"
 
