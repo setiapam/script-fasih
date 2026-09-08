@@ -71,14 +71,22 @@ Proyek ini telah direstrukturisasi sehingga semua skrip di dalam sub-folder berf
 │   ├── progress.json
 │   └── hasil_rekap.xlsx
 │
-└── change-mode/             # Modul: Ubah Moda Pengumpulan (PAPI/CAPI/CAWI)
+│
+├── change-mode/             # Modul: Ubah Moda Pengumpulan (PAPI/CAPI/CAWI)
+│   ├── __init__.py
+│   ├── hit_endpoint.py
+│   ├── curl.txt
+│   ├── config.json
+│   ├── change_mode.xlsx
+│   ├── completed_change_mode.json
+│   └── laporan_hasil_change_mode.xlsx
+│
+└── dtsen/                   # Modul: Update Status Pendataan DTSEN ke Excel
     ├── __init__.py
     ├── hit_endpoint.py
-    ├── curl.txt
+    ├── curl.txt             # Salinan cURL datatable penugasan (cukup 1 file)
     ├── config.json
-    ├── change_mode.xlsx
-    ├── completed_change_mode.json
-    └── laporan_hasil_change_mode.xlsx
+    └── dtsen_sample.xlsx    # Template berkas target DTSEN
 ```
 
 ---
@@ -119,6 +127,7 @@ python main.py assign
 python main.py tarik-data
 python main.py rekap
 python main.py change-mode
+python main.py dtsen
 ```
 
 ### 3. Melihat Bantuan Langkah Persiapan (Sebelum Run Script)
@@ -136,6 +145,7 @@ python main.py help assign
 python main.py help tarik-data
 python main.py help rekap
 python main.py help change-mode
+python main.py help dtsen
 ```
 
 *Catatan: Saat modul dijalankan lewat `main.py`, runner akan otomatis mengubah direktori kerja (working directory) secara dinamis ke folder modul tersebut agar seluruh file input/output (seperti `curl.txt`, `ids.json`) dibaca dan ditulis dari dalam folder masing-masing.*
@@ -336,5 +346,6 @@ Untuk melihat instruksi spesifik cara mendapatkan token cURL dan detail teknis m
 * **[Dokumentasi Modul Tarik Data](tarik-data/README.md)**
 * **[Dokumentasi Modul Rekap](rekap/README.md)**
 * **[Dokumentasi Modul Change Mode](change-mode/README.md)**
+* **[Dokumentasi Modul DTSEN](dtsen/README.md)**
 
 

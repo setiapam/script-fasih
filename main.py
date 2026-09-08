@@ -44,6 +44,11 @@ MODULES = {
         "name": "change-mode",
         "title": "Change Mode (Ubah Moda PAPI / CAPI / CAWI)",
         "desc": "Mengubah moda pengumpulan data sampel (PAPI/CAPI/CAWI) secara massal dari file Excel."
+    },
+    "9": {
+        "name": "dtsen",
+        "title": "DTSEN (Update Status Pendataan DTSEN ke Excel)",
+        "desc": "Mencocokkan target DTSEN ke API datatable FASIH per kelurahan dan memperbarui kolom I & J."
     }
 }
 
@@ -106,6 +111,14 @@ HELP_STEPS = {
         "2. Cari request 'change-mode' atau 'datatable' di web FASIH BPS -> Klik Kanan -> Copy as cURL (bash).",
         "3. Paste cURL tersebut ke berkas: change-mode/curl.txt",
         "4. Siapkan berkas Excel di change-mode/change_mode.xlsx dengan kolom header: idsbr, perusahaan, mode (pilihan: PAPI, CAPI, CAWI)."
+    ],
+    "dtsen": [
+        "1. Login ke website FASIH BPS di browser Anda dan buka menu Penugasan/Data survei.",
+        "2. Tekan F12 untuk membuka tab 'Network'. Lakukan refresh atau filter data.",
+        "3. Cari request DataTables penugasan ('datatable-all-user-survey-periode') -> Klik Kanan -> Copy as cURL (bash).",
+        "4. Paste cURL tersebut ke berkas: dtsen/curl.txt (cukup 1 file cURL).",
+        "5. Siapkan berkas Excel target (default: /home/murphi/Documents/dtsen_koja.xlsx).",
+        "6. Jalankan script: python main.py dtsen"
     ]
 }
 

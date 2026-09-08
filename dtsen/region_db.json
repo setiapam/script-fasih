@@ -1,0 +1,38 @@
+{
+  "3175040001": {
+    "id": "1242bf87-77fb-446d-8736-8ed251461cfa",
+    "fullCode": "3175040001",
+    "code": "001",
+    "name": "RAWABADAK SELATAN"
+  },
+  "3175040002": {
+    "id": "1cfc72ef-c133-43a0-be31-a1a6463e5abc",
+    "fullCode": "3175040002",
+    "code": "002",
+    "name": "TUGU SELATAN"
+  },
+  "3175040004": {
+    "id": "42302127-27bd-4947-b17e-787291f50b17",
+    "fullCode": "3175040004",
+    "code": "004",
+    "name": "LAGOA"
+  },
+  "3175040005": {
+    "id": "97af8c59-7d45-4057-9ffc-b53eac0e5e03",
+    "fullCode": "3175040005",
+    "code": "005",
+    "name": "RAWABADAK UTARA"
+  },
+  "3175040003": {
+    "id": "b8204198-0fef-442e-b396-4b77f9b671fe",
+    "fullCode": "3175040003",
+    "code": "003",
+    "name": "TUGU UTARA"
+  },
+  "3175040006": {
+    "id": "fc7c707d-fea9-4023-9082-60ca6b1a7d52",
+    "fullCode": "3175040006",
+    "code": "006",
+    "name": "KOJA"
+  }
+}
