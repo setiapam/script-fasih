@@ -144,48 +144,148 @@ python main.py help change-mode
 
 ## Cara Menambahkan Modul Baru
 
-Untuk memperluas fungsionalitas repositori ini dengan menambahkan modul baru, silakan ikuti langkah-langkah berikut:
+Untuk memperluas fungsionalitas repositori ini dengan menambahkan modul baru, silakan ikuti standar arsitektur dan langkah-langkah berikut:
 
-### Langkah 1: Buat Folder Modul Baru
-Buat folder baru di bawah root direktori proyek, misalnya `laporan-baru/`:
+### Standar Arsitektur Modul
+Setiap modul di repositori ini dirancang mandiri di dalam foldernya masing-masing dan wajib mematuhi konvensi berikut:
+1. **Template Dummy Aman (Bukan Data Riil)**: Seluruh file contoh input/output (`.xlsx`, `.csv`, `.txt`, `.json`, `curl.txt`) yang disertakan ke dalam Git **wajib hanya berupa data dummy/template**. Jangan pernah menyimpan data riil ataupun token/cookie aktif ke repositori.
+2. **Dynamic Working Directory**: Saat dipanggil via `main.py`, direktori kerja (*current working directory*) otomatis dialihkan ke folder modul terkait. Skrip dapat membaca dan menulis file lokal (seperti `curl.txt`, `config.json`, `execution.log`) langsung dengan path relatif tanpa prefix nama folder.
+3. **Deteksi Sesi Expired & Banner**: Wajib mendeteksi respons HTTP `401`/`403` atau pengalihan ke laman login Keycloak/SSO, lalu menampilkan banner instruksi yang ramah pengguna (`show_session_expired_banner()`) agar user paham bahwa cURL perlu diperbarui.
+4. **Resumable Checkpoint / State Persistence**: Simpan target yang berhasil diproses ke file JSON/Excel checkpoint (misalnya `completed_<modul>.json`) sehingga eksekusi yang terputus dapat dilanjutkan tanpa mengulang dari awal.
+5. **Standardized Logging & Summary**: Catat hasil eksekusi ke `execution.log` (hanya detail kegagalan yang dicatat pada ringkasan akhir log) dan cetak ringkasan standar terminal.
+
+---
+
+### Langkah-langkah Pembuatan Modul Baru
+
+#### Langkah 1: Buat Folder Modul Baru
+Buat folder baru di bawah root direktori proyek, misalnya `modul-baru/`:
 ```bash
-mkdir laporan-baru
+mkdir modul-baru
 ```
 
-### Langkah 2: Buat Kode Modul
-Buat file Python utama di dalam folder tersebut (misalnya `hit_endpoint.py`). Pastikan script Anda memiliki fungsi entrypoint `main()`:
+#### Langkah 2: Buat Berkas `__init__.py`
+Buat berkas `__init__.py` di dalam folder modul untuk mengekspor fungsi `main`:
 ```python
-# hit_endpoint.py
+# modul-baru/__init__.py
+from .hit_endpoint import main
+```
+
+#### Langkah 3: Buat Template Berkas Konfigurasi & Dummy
+Siapkan berkas-berkas template kosong/dummy di dalam folder modul:
+1. **`curl.txt`**: Berkas template cURL dengan placeholder token/cookie:
+   ```bash
+   curl --url 'https://fasih-sm.bps.go.id/app/api/...' \
+     -H 'accept: */*' \
+     -H 'content-type: application/json' \
+     -b 'SESSION=YOUR_SESSION_COOKIE_HERE; XSRF-TOKEN=YOUR_XSRF_TOKEN_HERE' \
+     -H 'x-xsrf-token: YOUR_XSRF_TOKEN_HERE'
+   ```
+2. **`config.json`**: Berkas state JSON default:
+   ```json
+   {
+     "surveyPeriodId": ""
+   }
+   ```
+3. **Input Data Contoh (Dummy)**: Jika menggunakan Excel/CSV, sertakan baris header dan 1-2 baris data contoh dummy (misal `modul_baru.xlsx` atau `data_target.csv`).
+
+#### Langkah 4: Buat Kode Utama Modul (`hit_endpoint.py`)
+Implementasikan logika utama dengan fungsi `main()`, parser cURL, deteksi sesi expired, sistem logging, dan ringkasan akhir:
+
+```python
+# modul-baru/hit_endpoint.py
+import os
+import sys
+import datetime
+import requests
+
+MODULE_CURL_PATH = "modul-baru/curl.txt"
+
+def is_session_expired(response):
+    if response.status_code in (401, 403):
+        return True
+    content_type = response.headers.get("Content-Type", "")
+    if "text/html" in content_type:
+        text_lower = response.text.lower()
+        if any(k in text_lower for k in ("login", "keycloak", "sso", "unauthorized")):
+            return True
+    return False
+
+def show_session_expired_banner(completed_count=0, total_count=0):
+    print("\n" + "=" * 65)
+    print("⚠️  [SESI LOGIN KADALUARSA / EXPIRED] (HTTP 401/403)")
+    print("=" * 65)
+    print(" Sesi login FASIH BPS atau token cURL Anda telah habis masa berlakunya.")
+    print(" BUKAN karena data tidak ada di server BPS, melainkan akses ditolak.")
+    print("\n Langkah mudah untuk melanjutkan:")
+    print("  1. Buka browser dan login ulang ke https://fasih-sm.bps.go.id")
+    print("  2. Buka tab Network (F12), lakukan interaksi/refresh halaman.")
+    print(f"  3. Salin (Copy as cURL) request terbaru ke berkas: {MODULE_CURL_PATH}")
+    print("  4. Jalankan ulang script (semua progress yang berhasil tersimpan otomatis).")
+    if total_count > 0:
+        print(f"\n Progress saat ini: {completed_count} dari {total_count} target selesai.")
+    print("=" * 65 + "\n")
+
 def main():
-    print("Modul baru berhasil dijalankan!")
+    print("[*] Memulai modul baru...")
+    log_file = "execution.log"
+    timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(log_file, "a", encoding="utf-8") as lf:
+        lf.write(f"\n==================================================\n")
+        lf.write(f"EKSEKUSI MODUL BARU: {timestamp_str}\n")
+        lf.write(f"==================================================\n")
+
+    # Logika eksekusi modul...
+    sukses = 0
+    gagal = 0
+    total = 0
+
+    # Cetak ringkasan akhir standar
+    print("\n" + "=" * 50)
+    print("           RINGKASAN AKHIR PENGEKSEKUSIAN")
+    print("=" * 50)
+    print(f" - Berhasil diproses : {sukses}")
+    print(f" - Gagal diproses    : {gagal}")
+    print(f" - Total target      : {total}")
+    print("=" * 50)
 
 if __name__ == "__main__":
     main()
 ```
 
-### Langkah 3: Tambahkan Berkas `__init__.py`
-Buat berkas `__init__.py` di dalam folder modul baru untuk mendaftarkannya sebagai package dan mengekspor fungsi `main`:
-```python
-# __init__.py
-from .hit_endpoint import main
-```
+#### Langkah 5: Daftarkan Modul Baru di `main.py`
+Buka berkas [main.py](main.py) di root direktori:
+1. Tambahkan informasi modul baru ke dictionary `MODULES`:
+   ```python
+   # main.py
+   MODULES = {
+       # ... modul yang sudah ada ...
+       "9": {
+           "name": "modul-baru",
+           "title": "Modul Baru (Judul Singkat)",
+           "desc": "Deskripsi singkat fungsi modul baru ini."
+       }
+   }
+   ```
+2. Tambahkan petunjuk langkah persiapan pada dictionary `HELP_STEPS`:
+   ```python
+   HELP_STEPS = {
+       # ...
+       "modul-baru": [
+           "1. Login ke website FASIH BPS di browser Anda.",
+           "2. Buka DevTools (F12) -> tab 'Network'.",
+           "3. Salin request API terkait sebagai cURL (bash).",
+           "4. Tempel ke berkas: modul-baru/curl.txt",
+           "5. Siapkan berkas input (jika ada), lalu jalankan: python main.py modul-baru"
+       ]
+   }
+   ```
 
-### Langkah 4: Daftarkan Modul Baru di `main.py`
-Buka berkas [main.py](main.py) di root direktori, lalu tambahkan entri baru ke dalam dictionary `MODULES`:
-```python
-# main.py
-MODULES = {
-    # ... modul yang sudah ada ...
-    "4": {
-        "name": "laporan-baru",
-        "title": "Laporan Baru (Deskripsi Singkat)",
-        "desc": "Detail fungsionalitas dari modul baru ini."
-    }
-}
-```
+#### Langkah 6: Tambahkan Dokumentasi Sub-Modul (`modul-baru/README.md`)
+Buat file `modul-baru/README.md` yang menjelaskan alur kerja modul, format file input/output, dan langkah mendapatkan cURL. Tautkan juga di daftar README utama.
 
-### Langkah 5: Tambahkan Dependensi Baru (Opsional)
-Jika modul baru Anda memerlukan pustaka python eksternal (misalnya `pandas`), tambahkan pustaka tersebut ke dalam file [requirements.txt](requirements.txt) di root proyek.
+#### Langkah 7: Tambahkan Dependensi Baru (Jika Diperlukan)
+Jika modul baru menggunakan dependensi pihak ketiga di luar standard library (seperti `pandas`, `openpyxl`), pastikan telah terdaftar di [requirements.txt](requirements.txt).
 
 ---
 
