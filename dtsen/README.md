@@ -39,9 +39,14 @@ python main.py dtsen
 ```
 Atau jalankan interaktif `python main.py` dan pilih menu `DTSEN`.
 
-Jika ingin menentukan path file Excel khusus:
+Jika ingin menentukan path file Excel khusus atau mereset progress dari awal:
 ```bash
+# Menjalankan dengan file Excel tertentu
 python main.py dtsen /home/murphi/Documents/dtsen_koja.xlsx
+
+# Mengulang proses dari baris pertama (mereset kolom I dan J)
+python main.py dtsen --reset
+python main.py dtsen /home/murphi/Documents/dtsen_koja.xlsx --reset
 ```
 
 ---

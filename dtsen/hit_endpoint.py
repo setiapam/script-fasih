@@ -18,6 +18,7 @@ import re
 import json
 import time
 import datetime
+from difflib import SequenceMatcher
 import shlex
 import requests
 import openpyxl
@@ -277,7 +278,20 @@ def query_fasih_datatable(headers, datatable_url, survey_period_id, region4_id, 
     payload = {
         "start": 0,
         "length": 10,
-        "columns": [{"data": "id", "orderable": True}],
+        "columns": [
+            {"data": "id", "orderable": True},
+            {"data": "codeIdentity", "orderable": True},
+            {"data": "data1", "orderable": True},
+            {"data": "data2", "orderable": True},
+            {"data": "data3", "orderable": True},
+            {"data": "data4", "orderable": True},
+            {"data": "data5", "orderable": True},
+            {"data": "data6", "orderable": True},
+            {"data": "data7", "orderable": True},
+            {"data": "data8", "orderable": True},
+            {"data": "data9", "orderable": True},
+            {"data": "data10", "orderable": True}
+        ],
         "order": [],
         "search": {"value": f'"{clean_search}"', "regex": False},
         "assignmentExtraParam": {
@@ -313,50 +327,134 @@ def query_fasih_datatable(headers, datatable_url, survey_period_id, region4_id, 
     return 429, []
 
 
-def evaluate_dtsen_rules(search_results):
+def clean_alphanumeric(text):
+    """Membersihkan teks menjadi hanya karakter alphanumeric uppercase tanpa spasi."""
+    return re.sub(r'[^A-Z0-9]', '', str(text or '').upper())
+
+
+def is_name_exact_match(target_name, fasih_data1):
+    """
+    Mengecek apakah target_name sama persis dengan salah satu nama yang ada di data1 FASIH.
+    Format data1 di FASIH umumnya 'NAMA_KK / NAMA_ANGGOTA' atau 'NAMA_TUNGGAL'.
+    """
+    clean_target = clean_alphanumeric(target_name)
+    if not clean_target:
+        return False
+
+    # Pecah berdasarkan slash jika ada multiple nama
+    parts = str(fasih_data1 or "").split("/")
+    for p in parts:
+        if clean_alphanumeric(p) == clean_target:
+            return True
+    return False
+
+
+def is_address_similar(target_addr, fasih_item, threshold=0.8):
+    """
+    Membandingkan kesamaan alamat target Excel dengan data FASIH.
+    FASIH menyimpan alamat di data2, atau nama SLS/RT/RW di region level5.
+    Returns True jika:
+    - Target ada di data2 atau sebaliknya (substring match)
+    - Rasio kemiripan string >= threshold (default 80%)
+    - Nama RT/RW level5 ada di dalam target_addr
+    """
+    clean_target = clean_alphanumeric(target_addr)
+    if not clean_target:
+        return False
+
+    # 1. Bandingkan dengan data2 (alamat lapangan di FASIH)
+    fasih_addr = fasih_item.get("data2", "")
+    clean_fasih_addr = clean_alphanumeric(fasih_addr)
+    if clean_fasih_addr:
+        if clean_target in clean_fasih_addr or clean_fasih_addr in clean_target:
+            return True
+        ratio = SequenceMatcher(None, clean_target, clean_fasih_addr).ratio()
+        if ratio >= threshold:
+            return True
+
+    # 2. Bandingkan dengan level5 (RT/RW) jika relevan
+    reg = fasih_item.get("region", {})
+    l5_name = reg.get("level1", {}).get("level2", {}).get("level3", {}).get("level4", {}).get("level5", {}).get("name", "")
+    clean_l5 = clean_alphanumeric(l5_name)
+    if clean_l5 and clean_l5 in clean_target:
+        return True
+
+    return False
+
+
+def evaluate_single_row_match(item):
+    """
+    Evaluasi 1 row match:
+    - status == open -> 'blm didata', ''
+    - status != open dan ada no urut bangunan (bukan -) -> 'sdh didata', 'ditemukan'
+    - status != open dan tidak ada no urut bangunan -> 'sdh didata', 'tidak ditemukan'
+    """
+    status_alias = str(item.get("assignmentStatusAlias", "")).strip().upper()
+    status_id = item.get("assignmentStatusId")
+
+    is_open = (status_alias == "OPEN") or (status_id == 0)
+    if is_open:
+        return "blm didata", ""
+
+    no_urut_raw = str(item.get("data3", "")).strip()
+    parts = no_urut_raw.split("/", 1)
+    no_bangunan = parts[0].strip()
+
+    has_nomor_bangunan = bool(no_bangunan and no_bangunan != "-" and no_bangunan != "")
+    if has_nomor_bangunan:
+        return "sdh didata", "ditemukan"
+    else:
+        return "sdh didata", "tidak ditemukan"
+
+
+def evaluate_dtsen_rules(search_results, target_name="", target_alamat=""):
     """
     Mengevaluasi hasil pencarian berdasarkan ketentuan:
-    a. 'sdh didata' di kolom I:
-       - 1 row match, status != open, ada nomor urut bangunan (bukan -) -> kolom J = 'ditemukan'
-       - 1 row match, status != open, tidak ada nomor urut bangunan (-) -> kolom J = 'tidak ditemukan'
-       - > 1 row match -> kolom J = 'ditemukan lebih dari 1 row'
-    b. 'blm didata' di kolom I:
-       - 1 row match, status == open -> kolom J = '-'
-       - 0 row match / tidak ketemu -> kolom J = '-'
+    a. 0 row match -> 'blm didata', ''
+    b. 1 row match -> panggil evaluate_single_row_match
+    c. > 1 row match:
+       - Cek apakah ada baris yang nama-nya sama persis dan alamatnya sama/mirip (>= 80%).
+       - Jika terfilter menjadi tepat 1 row kandidat kuat -> panggil evaluate_single_row_match.
+       - Jika tetap lebih dari 1 atau tidak ada yang spesifik -> 'sdh didata', 'ditemukan lebih dari 1 row'.
     """
     count = len(search_results)
 
     if count == 0:
         return "blm didata", ""
 
-    if count > 1:
-        return "sdh didata", "ditemukan lebih dari 1 row"
+    if count == 1:
+        return evaluate_single_row_match(search_results[0])
 
-    # Tepat 1 row match
-    item = search_results[0]
-    status_alias = str(item.get("assignmentStatusAlias", "")).strip().upper()
-    status_id = item.get("assignmentStatusId")
+    # Kasus > 1 row:
+    # 1. Filter nama sama persis
+    exact_name_candidates = [
+        item for item in search_results
+        if is_name_exact_match(target_name, item.get("data1", ""))
+    ]
 
-    # Status OPEN (id=0 atau alias='OPEN')
-    is_open = (status_alias == "OPEN") or (status_id == 0)
+    # 2. Dari kandidat nama sama persis, cek kesamaan alamat (>= 80% / substring)
+    if exact_name_candidates:
+        addr_candidates = [
+            item for item in exact_name_candidates
+            if is_address_similar(target_alamat, item, threshold=0.8)
+        ]
+        if len(addr_candidates) == 1:
+            # Ditemukan tepat 1 baris match kuat setelah filter alamat
+            return evaluate_single_row_match(addr_candidates[0])
 
-    if is_open:
-        return "blm didata", ""
-
-    # Status != OPEN -> cek nomor urut bangunan
-    # Pada sistem FASIH: data3 adalah 'No Urut Bangunan / IDSBR' (misal: '85 / ' atau '- / ' atau '-')
-    no_urut_raw = str(item.get("data3", "")).strip()
-
-    # Ekstrak bagian sebelum slash jika ada format 'NO / IDSBR'
-    parts = no_urut_raw.split("/", 1)
-    no_bangunan = parts[0].strip()
-
-    has_nomor_bangunan = bool(no_bangunan and no_bangunan != "-" and no_bangunan != "")
-
-    if has_nomor_bangunan:
-        return "sdh didata", "ditemukan"
+        if len(exact_name_candidates) == 1:
+            # Tepat 1 nama yang sama persis di hasil pencarian
+            return evaluate_single_row_match(exact_name_candidates[0])
     else:
-        return "sdh didata", "tidak ditemukan"
+        # Jika tidak ada yang sama persis namanya, cek apakah ada 1 yang alamatnya mirip
+        addr_candidates = [
+            item for item in search_results
+            if is_address_similar(target_alamat, item, threshold=0.8)
+        ]
+        if len(addr_candidates) == 1:
+            return evaluate_single_row_match(addr_candidates[0])
+
+    return "sdh didata", "ditemukan lebih dari 1 row"
 
 
 def main():
@@ -406,11 +504,21 @@ def main():
     group_id = resolve_group_id(headers, survey_period_id, datatable_url)
     region_db = load_or_fetch_region_db(headers, group_id)
 
-    # 3. Validasi Berkas Excel Input
+    # 3. Validasi Berkas Excel Input & Mode Reset
+    force_reset = "--reset" in sys.argv or "-r" in sys.argv
     excel_path = DEFAULT_INPUT_EXCEL
-    if len(sys.argv) > 1 and sys.argv[1].endswith(".xlsx"):
-        excel_path = sys.argv[1]
-    elif not os.path.exists(excel_path):
+
+    for arg in sys.argv[1:]:
+        if arg.endswith(".xlsx"):
+            # Periksa apakah path valid relatif thd cwd saat ini atau root
+            if os.path.exists(arg):
+                excel_path = os.path.abspath(arg)
+            elif os.path.exists(os.path.join("..", arg)):
+                excel_path = os.path.abspath(os.path.join("..", arg))
+        elif arg == "--reset" or arg == "-r":
+            force_reset = True
+
+    if not os.path.exists(excel_path):
         if os.path.exists("dtsen_sample.xlsx"):
             excel_path = "dtsen_sample.xlsx"
         else:
@@ -426,6 +534,14 @@ def main():
     if ws is None:
         print("❌ Gagal membaca sheet aktif pada file Excel.")
         return
+
+    if force_reset:
+        print("[!] Mode --reset aktif: Mengosongkan status Kolom I dan Kolom J untuk mengulang dari baris pertama...")
+        for r_reset in range(2, ws.max_row + 1):
+            ws.cell(row=r_reset, column=9).value = None
+            ws.cell(row=r_reset, column=10).value = None
+        wb.save(excel_path)
+        print("[*] Kolom I dan J berhasil direset. Memulai proses dari awal...")
 
     # Validasi header Kolom I dan Kolom J
     header_col_i = ws.cell(row=1, column=9).value
@@ -464,6 +580,7 @@ def main():
             total_target += 1
             kode_kel = ws.cell(row=row_idx, column=3).value
             nama_kel = ws.cell(row=row_idx, column=4).value
+            target_alamat = str(ws.cell(row=row_idx, column=5).value or "").strip()
             nama_anggota = ws.cell(row=row_idx, column=7).value
             val_col_i = ws.cell(row=row_idx, column=9).value
             val_col_j = ws.cell(row=row_idx, column=10).value
@@ -509,7 +626,7 @@ def main():
                 continue
 
             # Evaluasi aturan DTSEN
-            status_i, status_j = evaluate_dtsen_rules(results)
+            status_i, status_j = evaluate_dtsen_rules(results, target_name=nama_search, target_alamat=target_alamat)
 
             ws.cell(row=row_idx, column=9, value=status_i)
             ws.cell(row=row_idx, column=10, value=status_j)

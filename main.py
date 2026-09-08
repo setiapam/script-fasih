@@ -233,6 +233,9 @@ def main():
             found = False
             for info in MODULES.values():
                 if info["name"] == arg_action:
+                    # Teruskan argumen tambahan (seperti path excel atau flags) ke sub-modul
+                    sub_argv = [sys.argv[0]] + sys.argv[2:]
+                    sys.argv = sub_argv
                     run_module(arg_action)
                     found = True
                     break
