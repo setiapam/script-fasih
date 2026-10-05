@@ -30,6 +30,42 @@ Jika akun Admin/Dummy memerlukan verifikasi **Two-Factor Authentication (2FA / O
 
 ---
 
+## 🔑 Cara Mendapatkan TOTP Secret Key dari Authenticator
+
+TOTP Secret Key adalah teks rahasia (berisi huruf & angka base32) yang dijadikan dasar oleh aplikasi seperti Google Authenticator untuk menghasilkan 6 digit kode OTP yang berganti setiap 30 detik.
+
+Ada 3 cara untuk mendapatkannya:
+
+### Cara 1: Saat Pertama Kali Setup 2FA / Reset 2FA di Web SSO (Paling Mudah)
+Ketika Anda mengaktifkan 2FA di portal SSO/Keycloak atau meminta admin mereset 2FA akun:
+1. Di layar akan muncul **QR Code**.
+2. Di bawah atau di dekat QR Code tersebut biasanya terdapat opsi teks: **`"Can't scan it?"`** / **`"Unable to scan code?"`** / **`"Secret Key / Entry Code"`**.
+3. Klik tautan tersebut $\to$ akan muncul teks string panjang (misal: `JBSWY3DPEHPK3PXP` atau `4SDF7K...`).
+4. Salin string teks tersebut dan tempel ke field `totp_secret` di `credentials.json`.
+
+---
+
+### Cara 2: Ekspor dari Google Authenticator (Jika Akun Sudah Ada di HP)
+Google Authenticator memiliki fitur transfer akun:
+1. Buka aplikasi **Google Authenticator** di HP.
+2. Ketuk ikon menu garis tiga (kiri atas) atau menu opsi $\to$ Pilih **Transfer accounts** (Transfer akun) $\to$ **Export accounts** (Ekspor akun).
+3. Pilih akun BPS / SSO yang ingin diekspor $\to$ Aplikasi akan menampilkan sebuah **QR Code besar**.
+4. Foto / screenshot QR Code tersebut, lalu scan menggunakan QR Scanner biasa di HP atau laptop (misal via web `webqr.com` atau tool ZXing).
+5. Hasil scan akan berupa teks berformat:
+   `otpauth-migration://offline?data=...`
+6. Teks migration tersebut bisa didecode menjadi `otpauth://totp/...` atau string base32 yang langsung bisa ditempelkan ke `totp_secret`.
+
+---
+
+### Cara 3: Menggunakan Password Manager (Bitwarden / 1Password / Vaultwarden)
+Jika Anda menyimpan 2FA di password manager seperti **Bitwarden** atau **Vaultwarden**:
+1. Buka item login akun di web/ekstensi Bitwarden/Vaultwarden.
+2. Lihat field **Authenticator Key (TOTP)**.
+3. Klik tombol **Edit** $\to$ string rahasia base32 akun Anda akan terlihat jelas.
+4. Salin string tersebut dan tempelkan ke `credentials.json`.
+
+---
+
 ## 🛠️ Prasyarat (Prerequisites)
 
 1. **Jaringan / VPN**: Script mengakses endpoint internal BPS (`https://fasih-sm.bps.go.id`). Wajib dijalankan di jaringan kantor atau melalui VPN/Dev Gateway (LXC 107).
@@ -55,7 +91,7 @@ Isi konfigurasinya:
     "login_type": "eksternal",
     "username": "3175.maegan@dummy.sobat.id",
     "password": "PasswordAkunAnda",
-    "totp_secret": ""
+    "totp_secret": "JBSWY3DPEHPK3PXP"
   }
 }
 ```
