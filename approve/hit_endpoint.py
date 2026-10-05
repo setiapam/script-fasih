@@ -8,8 +8,12 @@ import sys
 import copy
 import time
 import urllib3
+import warnings
 
-urllib3.disable_warnings()
+# Hindari pemanggilan urllib3.disable_warnings() secara global di Windows Python 3.13+,
+# karena urllib3.disable_warnings() memicu bug OpenSSL stale errno=2 (FileNotFoundError)
+# saat TLS shutdown tanpa close_notify.
+warnings.filterwarnings('ignore', category=urllib3.exceptions.InsecureRequestWarning)
 
 BASE_REGION_URL = "https://fasih-sm.bps.go.id/app/api/region/api/v1/region"
 SSO_EKSTERNAL_AUTH = "https://fasih-sm.bps.go.id/oauth2/authorization/eksternal"
@@ -152,7 +156,8 @@ def login_keycloak_with_totp(username, password, login_type="eksternal", totp_se
     if session is None:
         session = requests.Session()
         session.headers.update({
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Connection": "close"
         })
 
     auth_url = SSO_EKSTERNAL_AUTH if str(login_type).lower() == "eksternal" else SSO_BPS_AUTH
