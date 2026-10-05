@@ -79,7 +79,7 @@ Jika Anda menyimpan 2FA di password manager seperti **Bitwarden** atau **Vaultwa
 
 ## 📂 Konfigurasi Berkas
 
-### 1. `approve/credentials.json` (Konfigurasi Akun Admin/Dummy)
+### 1. `approve/credentials.json` (Konfigurasi Akun)
 Salin berkas contoh `approve/credentials.example.json` menjadi `approve/credentials.json`:
 ```bash
 cp approve/credentials.example.json approve/credentials.json
@@ -90,19 +90,27 @@ Isi konfigurasinya:
   "admin_account": {
     "login_type": "eksternal",
     "username": "3175.maegan@dummy.sobat.id",
-    "password": "PasswordAkunAnda",
-    "totp_secret": "JBSWY3DPEHPK3PXP"
+    "password": "PasswordAkunAdmin",
+    "totp_secret": ""
+  },
+  "approver_account": {
+    "login_type": "sso_bps",
+    "username": "hanifah.afuwu",
+    "password": "PasswordAkunPengawas",
+    "totp_secret": ""
   }
 }
 ```
+* **`admin_account`**: Digunakan untuk auto-fetch seluruh data se-kelurahan tanpa batasan alokasi perorangan Sub-SLS.
+* **`approver_account`**: Akun Pengawas (yang memiliki hak menyetujui dokumen). **Opsional**: jika bagian ini dikosongkan, script akan otomatis menggunakan sesi dari berkas `approve/curl.txt` seperti sebelumnya.
 * **`login_type`**: 
   - `"eksternal"` : Untuk akun SSO Eksternal / Mitra Sobat.
   - `"sso_bps"`   : Untuk akun SSO Pegawai BPS resmi (`@bps.go.id`).
-* **`totp_secret`**: Seed key base32 (opsional, kosongkan jika ingin memasukkan OTP via terminal saat script berjalan).
+* **`totp_secret`**: Seed key base32 (opsional, jika kosong script memunculkan prompt input OTP di terminal saat login).
 * **Catatan Keamanan**: Berkas `credentials.json` sudah didaftarkan ke `.gitignore` sehingga aman dan tidak akan ter-push ke repository git publik.
 
-### 2. `approve/curl.txt` (Sesi Akun Pengawas)
-Tempatkan salinan cURL dari browser saat login sebagai akun **Pengawas** (yang memiliki hak menyetujui dokumen).
+### 2. `approve/curl.txt` (Metode Manual / Cadangan)
+Jika Anda tidak mengisi `approver_account` di `credentials.json`, Anda tetap bisa menempelkan cURL request akun Pengawas dari browser ke `approve/curl.txt` seperti biasa.
 
 ---
 

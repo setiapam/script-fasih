@@ -192,10 +192,18 @@ def login_keycloak_with_totp(username, password, login_type="eksternal", totp_se
 
             r_otp = session.post(otp_url, data={"otp": otp_code}, verify=False, timeout=20, allow_redirects=False)
             if r_otp.status_code != 302:
-                raise RuntimeError(f"Submit OTP ditolak oleh server (Status HTTP {r_otp.status_code}).")
+                err_otp = "Kode OTP tidak valid atau ditolak oleh server."
+                m_err = re.search(r'<span[^>]*class="[^"]*kc-feedback-text[^"]*"[^>]*>(.*?)</span>', r_otp.text, re.DOTALL)
+                if m_err:
+                    err_otp = re.sub(r'<[^>]+>', '', m_err.group(1)).strip()
+                raise RuntimeError(f"Submit OTP gagal: {err_otp} (Status HTTP {r_otp.status_code})")
             redirect_url = r_otp.headers.get("Location")
         else:
-            raise RuntimeError(f"Login ditolak atau gagal memuat form OTP. Respons server: {r2.text[:300]}")
+            err_msg = "Username atau password salah (Invalid username or password)."
+            m_err = re.search(r'<span[^>]*class="[^"]*kc-feedback-text[^"]*"[^>]*>(.*?)</span>', r2.text, re.DOTALL)
+            if m_err:
+                err_msg = re.sub(r'<[^>]+>', '', m_err.group(1)).strip()
+            raise RuntimeError(f"Login Keycloak ditolak: {err_msg}")
     elif r2.status_code == 302:
         redirect_url = r2.headers.get("Location")
     else:
@@ -293,34 +301,85 @@ def main():
     print("=" * 60)
 
     # 1. Siapkan Sesi Pengawas (Eksekutor Approval)
-    print("[*] Membaca sesi pengawas dari approve/curl.txt...")
-    try:
-        with open('curl.txt', 'r', encoding='utf-8') as f:
-            curl_content = f.read().strip()
-    except FileNotFoundError:
-        print("[!] File curl.txt tidak ditemukan!")
-        print("    Silakan buat file 'approve/curl.txt' dan tempel perintah cURL dari akun Pengawas.")
-        return
+    session_approver = None
+    headers_approver = None
+    survey_period_id = None
+    datatable_url = "https://fasih-sm.bps.go.id/app/api/analytic/api/v2/assignment/datatable-all-user-survey-periode"
 
-    commands = split_curl_commands(curl_content)
-    parsed_curl = None
-    for cmd in commands:
-        parsed = parse_curl(cmd)
-        if parsed.get('url') and ('datatable' in parsed['url'] or 'survey-periode' in parsed['url']):
-            parsed_curl = parsed
-            break
-        if parsed.get('data') and ('"start"' in parsed['data'] or '"columns"' in parsed['data']):
-            parsed_curl = parsed
-            break
+    cred_file = "credentials.json"
+    approver_creds = {}
+    if os.path.exists(cred_file):
+        try:
+            with open(cred_file, 'r', encoding='utf-8') as cf:
+                approver_creds = json.load(cf).get("approver_account", {})
+        except Exception:
+            pass
 
-    if not parsed_curl and commands:
-        parsed_curl = parse_curl(commands[0])
+    # Jika approver_account diisi di credentials.json, gunakan login otomatis
+    if approver_creds.get("username") and approver_creds.get("password"):
+        print(f"[*] Menemukan konfigurasi akun Pengawas di {cred_file}: {approver_creds['username']}")
+        try:
+            session_approver = login_keycloak_with_totp(
+                username=approver_creds["username"],
+                password=approver_creds["password"],
+                login_type=approver_creds.get("login_type", "sso_bps"),
+                totp_secret=approver_creds.get("totp_secret")
+            )
+            headers_approver = {
+                "X-XSRF-TOKEN": session_approver.cookies.get("XSRF-TOKEN", ""),
+                "Content-Type": "application/json"
+            }
+        except Exception as e:
+            print(f"[!] Gagal login otomatis akun Pengawas: {e}")
+            print("[*] Beralih ke metode pembacaan berkas approve/curl.txt...")
 
-    if not parsed_curl or not parsed_curl.get('headers'):
-        print("[!] Gagal mengekstrak headers dan cookies dari curl.txt.")
-        return
+    # Fallback / Model sebelumnya: Membaca approve/curl.txt
+    if not headers_approver:
+        print("[*] Membaca sesi pengawas dari approve/curl.txt...")
+        try:
+            with open('curl.txt', 'r', encoding='utf-8') as f:
+                curl_content = f.read().strip()
+        except FileNotFoundError:
+            print("[!] File curl.txt maupun approver_account di credentials.json tidak ditemukan!")
+            print("    Silakan buat file 'approve/curl.txt' atau lengkapi 'approver_account' di credentials.json.")
+            return
 
-    survey_period_id = extract_survey_period_id(parsed_curl, curl_content)
+        commands = split_curl_commands(curl_content)
+        parsed_curl = None
+        for cmd in commands:
+            parsed = parse_curl(cmd)
+            if parsed.get('url') and ('datatable' in parsed['url'] or 'survey-periode' in parsed['url']):
+                parsed_curl = parsed
+                break
+            if parsed.get('data') and ('"start"' in parsed['data'] or '"columns"' in parsed['data']):
+                parsed_curl = parsed
+                break
+
+        if not parsed_curl and commands:
+            parsed_curl = parse_curl(commands[0])
+
+        if not parsed_curl or not parsed_curl.get('headers'):
+            print("[!] Gagal mengekstrak headers dan cookies dari curl.txt.")
+            return
+
+        survey_period_id = extract_survey_period_id(parsed_curl, curl_content)
+        headers_approver = dict(parsed_curl['headers'])
+        headers_approver['Content-Type'] = 'application/json'
+        if parsed_curl.get('url') and 'approval' not in parsed_curl['url']:
+            datatable_url = parsed_curl['url']
+
+    if not survey_period_id:
+        if os.path.exists('config.json'):
+            try:
+                with open('config.json', 'r', encoding='utf-8') as f:
+                    survey_period_id = json.load(f).get('surveyPeriodId')
+            except Exception:
+                pass
+        if not survey_period_id:
+            sp_input = input("[?] Masukkan surveyPeriodId kegiatan (contoh: fd68e454-ba45-4b85-8205-f3bf777ded24): ").strip()
+            if sp_input:
+                survey_period_id = sp_input
+
     if survey_period_id:
         print(f"[*] Terdeteksi surveyPeriodId: {survey_period_id}")
 
@@ -346,15 +405,8 @@ def main():
         except Exception:
             pass
 
-    headers_approver = dict(parsed_curl['headers'])
-    headers_approver['Content-Type'] = 'application/json'
-
-    datatable_url = parsed_curl.get('url')
-    if not datatable_url or 'approval' in datatable_url:
-        datatable_url = "https://fasih-sm.bps.go.id/app/api/analytic/api/v2/assignment/datatable-all-user-survey-periode"
-
     base_payload = None
-    if parsed_curl.get('data'):
+    if parsed_curl and parsed_curl.get('data'):
         try:
             base_payload = json.loads(parsed_curl['data'])
         except Exception:
