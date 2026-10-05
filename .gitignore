@@ -16,3 +16,9 @@ tarik-data/result.xlsx
 tarik-data/result_temp.json
 tarik-data/temp_records/
 
+# Local credentials & tokens
+approve/credentials.json
+credentials.json
+*.secret.json
+
+
