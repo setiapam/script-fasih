@@ -5,6 +5,10 @@ import requests
 import datetime
 import os
 import sys
+import copy
+import time
+
+BASE_REGION_URL = "https://fasih-sm.bps.go.id/app/api/region/api/v1/region"
 
 def is_session_expired_response(response):
     """Mendeteksi apakah response menandakan sesi login / cURL sudah kadaluarsa."""
@@ -147,9 +151,115 @@ def extract_survey_period_id(parsed_curl, raw_curl_content=""):
 
     return ""
 
+def resolve_group_id(headers, survey_period_id, datatable_url):
+    """
+    Mendeteksi groupId wilayah secara otomatis dari datatable atau file region.
+    """
+    for path in ['config.json', '../tarik-data/config.json']:
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    c = json.load(f)
+                    if c.get('groupId'):
+                        return c['groupId']
+            except Exception:
+                pass
+
+    for rpath in ['curl_region.txt', '../tarik-data/curl_region.txt']:
+        if os.path.exists(rpath):
+            try:
+                with open(rpath, 'r', encoding='utf-8') as f:
+                    m = re.search(r'groupId=([a-f0-9\-]{36})', f.read())
+                    if m:
+                        return m.group(1)
+            except Exception:
+                pass
+
+    payload = {
+        "start": 0,
+        "length": 1,
+        "columns": [{"data": "id", "orderable": True}],
+        "order": [],
+        "search": {"value": "", "regex": False},
+        "assignmentExtraParam": {
+            "surveyPeriodId": survey_period_id,
+            "assignmentErrorStatusType": -1,
+            "filterTargetType": "TARGET_ONLY"
+        }
+    }
+    try:
+        r = requests.post(datatable_url, headers=headers, json=payload, timeout=15)
+        if r.status_code == 200:
+            res = r.json()
+            items = res.get("searchData") or res.get("data") or []
+            if items:
+                first = items[0]
+                meta = first.get("regionMetadata")
+                if isinstance(meta, dict) and meta.get("id"):
+                    return meta["id"]
+                reg = first.get("region")
+                if isinstance(reg, dict) and reg.get("groupId"):
+                    return reg["groupId"]
+    except Exception:
+        pass
+
+    return "a45adac1-e711-4c15-b3f9-1f30fc151565"
+
+def fetch_region_children(headers, level, group_id, parent_code):
+    """
+    Mengambil daftar anak wilayah (level5 SLS atau level6 Sub-SLS) berdasarkan parentCode.
+    """
+    params = {"groupId": group_id, f"level{level - 1}FullCode": parent_code}
+    url = f"{BASE_REGION_URL}/level{level}"
+    try:
+        r = requests.get(url, headers=headers, params=params, timeout=15)
+        if r.status_code == 200:
+            if is_session_expired_response(r):
+                return None
+            data = r.json()
+            if isinstance(data, list):
+                return data
+            elif isinstance(data, dict):
+                return data.get('data', data.get('content', [data]))
+            return []
+    except Exception as e:
+        print(f"      [!] Gagal mengambil region level {level} (parent {parent_code}): {e}")
+    return []
+
+def extract_submitted_ids_from_items(data_list):
+    """
+    Hanya mengekstrak ID penugasan yang berstatus SUBMITTED (menunggu approval).
+    Mendukung field assignmentStatusAlias, assignmentStatusId, status, atau string identifikasi.
+    """
+    valid_ids = []
+    for item in data_list:
+        if not isinstance(item, dict):
+            continue
+        
+        item_id = item.get('id')
+        if not item_id:
+            continue
+
+        status_alias = str(item.get('assignmentStatusAlias') or item.get('status') or '').strip().upper()
+        status_id = item.get('assignmentStatusId')
+        
+        is_submitted = False
+        if 'SUBMIT' in status_alias and 'APPROV' not in status_alias and 'REJECT' not in status_alias:
+            is_submitted = True
+        elif status_id in (2, 3):
+            is_submitted = True
+        elif not status_alias and status_id is None:
+            is_submitted = True
+
+        if is_submitted:
+            valid_ids.append(item_id)
+
+    return valid_ids
+
 def main():
     print("=" * 60)
     print("           BULK APPROVAL AUTOMATION SCRIPT")
+    print("           (Filter: SUBMITTED Only + Auto Kelurahan)")
     print("=" * 60)
 
     print("[*] Membaca perintah cURL dari curl.txt...")
@@ -183,7 +293,6 @@ def main():
     if survey_period_id:
         print(f"[*] Terdeteksi surveyPeriodId: {survey_period_id}")
 
-    # Cek pergantian kegiatan survei via config.json
     config_file = 'config.json'
     prev_period_id = None
     if os.path.exists(config_file):
@@ -194,7 +303,6 @@ def main():
         except Exception:
             pass
 
-    # Jika terjadi pergantian kegiatan survei, reset list ID lama
     if survey_period_id and prev_period_id and prev_period_id != survey_period_id:
         print(f"\n🔄 Terdeteksi pergantian kegiatan survei.")
         print(f"   - Periode Baru : {survey_period_id}")
@@ -203,7 +311,6 @@ def main():
         if os.path.exists('ids.json'):
             os.remove('ids.json')
 
-    # Simpan surveyPeriodId aktif ke config.json
     if survey_period_id:
         try:
             with open(config_file, 'w', encoding='utf-8') as f:
@@ -239,16 +346,24 @@ def main():
             "assignmentExtraParam": {"assignmentErrorStatusType": -1, "filterTargetType": "TARGET_ONLY"}
         }
 
+    # ENFORCE FILTER: Selalu pasang filter SUBMITTED di payload query
+    if 'assignmentExtraParam' not in base_payload:
+        base_payload['assignmentExtraParam'] = {}
+    base_payload['assignmentExtraParam']['assignmentStatusAlias'] = "SUBMITTED BY PPL"
+    if survey_period_id and not base_payload['assignmentExtraParam'].get('surveyPeriodId'):
+        base_payload['assignmentExtraParam']['surveyPeriodId'] = survey_period_id
+
     all_ids = []
 
     print("\n[?] Pilih sumber ID untuk diproses:")
-    print("1. Ambil dari API DataTables (otomatis semua hasil dari curl)")
-    print("2. Gunakan ID dari berkas ids.json (cache/sebelumnya)")
-    print("3. Baca dari berkas id_spesifik.txt (satu ID per baris)")
-    print("4. Masukkan ID secara manual via terminal")
-    pilihan = input("Masukkan pilihan (1/2/3/4) [1]: ").strip()
+    print("1. Ambil dari API DataTables (otomatis sesuai filter curl.txt)")
+    print("2. [FITUR JITU] Auto-Expand 1 Kelurahan (Otomatis sisir semua SLS & Sub-SLS)")
+    print("3. Gunakan ID dari berkas ids.json (cache/sebelumnya)")
+    print("4. Baca dari berkas id_spesifik.txt (satu ID per baris)")
+    print("5. Masukkan ID secara manual via terminal")
+    pilihan = input("Masukkan pilihan (1/2/3/4/5) [1]: ").strip()
 
-    if pilihan == '2':
+    if pilihan == '3':
         if os.path.exists('ids.json'):
             try:
                 with open('ids.json', 'r', encoding='utf-8') as f:
@@ -261,8 +376,8 @@ def main():
         else:
             print("[!] Berkas ids.json tidak ditemukan!")
             return
-            
-    elif pilihan == '3':
+
+    elif pilihan == '4':
         if os.path.exists('id_spesifik.txt'):
             try:
                 with open('id_spesifik.txt', 'r', encoding='utf-8') as f:
@@ -274,8 +389,8 @@ def main():
         else:
             print("[!] Berkas id_spesifik.txt tidak ditemukan!")
             return
-            
-    elif pilihan == '4':
+
+    elif pilihan == '5':
         ids_input = input("Masukkan ID (pisahkan dengan koma jika lebih dari satu):\n> ").strip()
         all_ids = [i.strip() for i in ids_input.split(',') if i.strip()]
         print(f" -> Memperoleh {len(all_ids)} ID dari input manual.")
@@ -283,8 +398,118 @@ def main():
             print("[!] Tidak ada ID yang dimasukkan.")
             return
 
+    elif pilihan == '2':
+        print("\n" + "=" * 55)
+        print("   MODE AUTO-EXPAND KELURAHAN (SEMUA SLS/SUB-SLS)")
+        print("=" * 55)
+
+        extra_param = base_payload.get('assignmentExtraParam', {})
+        reg1 = extra_param.get('region1Id')
+        reg2 = extra_param.get('region2Id')
+        reg3 = extra_param.get('region3Id')
+        reg4 = extra_param.get('region4Id')
+
+        group_id = resolve_group_id(headers_json, survey_period_id, datatable_url)
+        print(f"[*] groupId region terdeteksi: {group_id}")
+
+        parent_kel_code = input("Masukkan 10 digit Kode Kelurahan (misal: 3175040001): ").strip()
+        if not parent_kel_code or len(parent_kel_code) < 10:
+            print("[!] Kode kelurahan wajib minimal 10 digit!")
+            return
+
+        print(f"\n[*] Mengambil daftar SLS (Level 5) di bawah Kelurahan {parent_kel_code}...")
+        sls_list = fetch_region_children(headers_json, 5, group_id, parent_kel_code)
+        if sls_list is None:
+            show_session_expired_banner("approve/curl.txt")
+            return
+
+        if not sls_list:
+            print(f"[!] Tidak ada SLS yang ditemukan untuk kelurahan {parent_kel_code}.")
+            return
+
+        print(f"    [+] Ditemukan {len(sls_list)} SLS.")
+
+        subsls_targets = []
+        for idx_sls, sls in enumerate(sls_list):
+            sls_code = sls.get('fullCode')
+            sls_id = sls.get('id')
+            sls_name = sls.get('name', '')
+            print(f" -> [{idx_sls+1}/{len(sls_list)}] Mengecek Sub-SLS untuk {sls_name} ({sls_code})...")
+            
+            sub_list = fetch_region_children(headers_json, 6, group_id, sls_code)
+            if sub_list:
+                for sub in sub_list:
+                    subsls_targets.append({
+                        "region1Id": reg1,
+                        "region2Id": reg2,
+                        "region3Id": reg3,
+                        "region4Id": reg4,
+                        "region5Id": sls_id,
+                        "region6Id": sub.get('id'),
+                        "code": sub.get('fullCode'),
+                        "name": f"{sls_name} - {sub.get('name')}"
+                    })
+            else:
+                subsls_targets.append({
+                    "region1Id": reg1,
+                    "region2Id": reg2,
+                    "region3Id": reg3,
+                    "region4Id": reg4,
+                    "region5Id": sls_id,
+                    "region6Id": None,
+                    "code": sls_code,
+                    "name": sls_name
+                })
+            time.sleep(0.1)
+
+        print(f"\n[*] Total {len(subsls_targets)} Sub-SLS siap ditarik sampel SUBMITTED-nya...")
+
+        all_ids = []
+        for s_idx, target in enumerate(subsls_targets):
+            payload_sub = copy.deepcopy(base_payload)
+            payload_sub['assignmentExtraParam']['region5Id'] = target['region5Id']
+            if target['region6Id']:
+                payload_sub['assignmentExtraParam']['region6Id'] = target['region6Id']
+            payload_sub['assignmentExtraParam']['assignmentStatusAlias'] = "SUBMITTED BY PPL"
+
+            start = 0
+            length = 100
+            while True:
+                payload_sub['start'] = start
+                payload_sub['length'] = length
+                try:
+                    res = requests.post(datatable_url, headers=headers_json, json=payload_sub, timeout=20)
+                    if is_session_expired_response(res):
+                        show_session_expired_banner("approve/curl.txt")
+                        return
+                    if res.status_code != 200:
+                        break
+                    res_json = res.json()
+                    items = res_json.get('data') or res_json.get('searchData') or []
+                    if not items:
+                        break
+
+                    submitted_ids = extract_submitted_ids_from_items(items)
+                    all_ids.extend(submitted_ids)
+
+                    if len(items) < length:
+                        break
+                    start += length
+                except Exception:
+                    break
+
+            print(f" -> [{s_idx+1}/{len(subsls_targets)}] {target['name']} | Ditemukan: {len(all_ids)} SUBMITTED terakumulasi.")
+            time.sleep(0.15)
+
+        if all_ids:
+            with open('ids.json', 'w', encoding='utf-8') as f:
+                json.dump([{"id": x} for x in all_ids], f, indent=2)
+            print(f"\n[*] Total {len(all_ids)} ID berstatus SUBMITTED berhasil dikumpulkan dan disimpan ke ids.json.")
+
     else:
-        print("\n[*] Menjalankan alur pengambilan data ID assignment dari API DataTables...")
+        print("\n[*] Menjalankan penarikan data ID assignment dari API DataTables...")
+        print("[*] Menerapkan filter: Hanya dokumen berstatus SUBMITTED...")
+        
         start = base_payload.get('start', 0)
         length = base_payload.get('length', 100)
         if length <= 0:
@@ -325,16 +550,10 @@ def main():
                 print(" -> Halaman kosong / tidak ada data lagi.")
                 break
 
-            page_ids = []
-            for item in data_list:
-                if isinstance(item, dict) and 'id' in item:
-                    page_ids.append(item['id'])
-                elif isinstance(item, list) and len(item) > 0:
-                    page_ids.append(item[0])
-
+            page_ids = extract_submitted_ids_from_items(data_list)
             all_ids.extend(page_ids)
-            total_str = f" / {records_filtered}" if records_filtered is not None else ""
-            print(f" -> Halaman {page}: Ditemukan {len(page_ids)} ID. Total terakumulasi: {len(all_ids)}{total_str} ID.")
+            
+            print(f" -> Halaman {page}: Ditemukan {len(page_ids)} ID (SUBMITTED). Total: {len(all_ids)} ID.")
 
             if len(data_list) < length:
                 break
@@ -349,29 +568,30 @@ def main():
             ids_to_save = [{"id": item_id} for item_id in all_ids]
             with open('ids.json', 'w', encoding='utf-8') as f:
                 json.dump(ids_to_save, f, indent=2)
-            print(f"\n[*] Berhasil menyimpan {len(all_ids)} ID ke berkas ids.json.")
+            print(f"\n[*] Berhasil menyimpan {len(all_ids)} ID SUBMITTED ke berkas ids.json.")
         else:
-            print("[!] Tidak ada ID yang ditemukan dari API DataTables.")
+            print("[!] Tidak ada ID berstatus SUBMITTED yang ditemukan dari API DataTables.")
             return
 
     if not all_ids:
         print("[!] Tidak ada ID yang akan diproses untuk approval.")
         return
 
-    print(f"\n[?] Siap melakukan approval massal untuk {len(all_ids)} assignment.")
+    all_ids = list(dict.fromkeys(all_ids))
+
+    print(f"\n[?] Siap melakukan approval massal untuk {len(all_ids)} assignment (STATUS: SUBMITTED ONLY).")
     confirm = input(f"Apakah Anda yakin ingin menyetujui (approve) {len(all_ids)} assignment ini? (Y/n): ").strip().lower()
     if confirm == 'n':
         print("[*] Dibatalkan oleh pengguna.")
         return
 
-    # Sesuai Endpoint user terbaru atau default (coba pakai yg dari curl user: /app/api/assignment-approval/api/v2/approval atau biarkan default sebelumnya)
     url_approval = "https://fasih-sm.bps.go.id/app/api/assignment-approval/api/v2/approval"
     timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_file = "execution.log"
 
     with open(log_file, "a", encoding="utf-8") as lf:
         lf.write(f"\n==================================================\n")
-        lf.write(f"EKSEKUSI APPROVE: {timestamp_str}\n")
+        lf.write(f"EKSEKUSI APPROVE (SUBMITTED ONLY): {timestamp_str}\n")
         lf.write(f"==================================================\n")
 
     print(f"\n[*] Memulai proses approval untuk {len(all_ids)} ID...\n")
@@ -387,22 +607,15 @@ def main():
         with open(log_file, "a", encoding="utf-8") as lf:
             lf.write(log_msg + "\n")
 
-        # Approval endpoint requires Content-Type: application/json in the new curl format provided by user, 
-        # but let's send it as multipart just in case, unless we want to change it to JSON. 
-        # Wait, I will keep multipart for approve because it was written like that before, 
-        # or change it to JSON based on user's new reject curl.
-        # Let's use JSON payload for approve as well to be consistent.
         payload = {
             "assignmentId": assignment_id,
             "statusApproval": "true",
             "comment": "{\"dataKey\":\"\",\"notes\":[]}"
         }
-        
+
         try:
             response = requests.post(url_approval, headers=headers_json, json=payload, timeout=15)
-            # fallback ke cara lama jika error 415/400?
             if response.status_code not in (200, 201) and not is_session_expired_response(response):
-                # coba pakai multipart/form-data
                 multipart_data = {
                     'assignmentId': (None, assignment_id),
                     'statusApproval': (None, 'true'),
