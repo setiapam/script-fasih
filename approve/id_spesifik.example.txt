@@ -1,0 +1,6 @@
+# Contoh daftar assignmentId spesifik yang ingin diapprove (satu ID per baris)
+# Baris yang diawali dengan tanda pagar (#) atau baris kosong akan diabaikan.
+# Salin file ini menjadi 'id_spesifik.txt' (bisa ditaruh di folder utama atau di dalam folder approve/)
+
+# 9a839c21-f88a-460a-87a7-231e43863556
+# 247013e4-a7eb-48b6-8471-f76094270821

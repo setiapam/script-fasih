@@ -16,6 +16,11 @@ tarik-data/result.xlsx
 tarik-data/result_temp.json
 tarik-data/temp_records/
 
+# Local Specific ID Input Files
+*id_spesifik.txt
+approve/id_spesifik.txt
+reject/id_spesifik.txt
+
 # Local credentials & tokens
 approve/credentials.json
 credentials.json

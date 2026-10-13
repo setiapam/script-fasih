@@ -614,18 +614,28 @@ def main():
             return
 
     elif pilihan == '4':
-        if os.path.exists('id_spesifik.txt'):
+        # Dukung pencarian baik di folder aktif (approve/) maupun root repositori (/)
+        candidates = ['id_spesifik.txt', os.path.join(os.path.dirname(__file__), 'id_spesifik.txt'), os.path.join(os.path.dirname(__file__), '..', 'id_spesifik.txt')]
+        found_file = None
+        for cand in candidates:
+            if os.path.exists(cand):
+                found_file = cand
+                break
+
+        if found_file:
             try:
-                with open('id_spesifik.txt', 'r', encoding='utf-8') as f:
+                with open(found_file, 'r', encoding='utf-8') as f:
                     for line in f.read().splitlines():
-                        if line.strip():
-                            all_targets.append({"id": line.strip(), "nama": "-"})
-                print(f" -> Berhasil memuat {len(all_targets)} ID dari id_spesifik.txt")
+                        raw_id = line.strip()
+                        if raw_id and not raw_id.startswith('#'):
+                            all_targets.append({"id": raw_id, "nama": "-"})
+                print(f" -> Berhasil memuat {len(all_targets)} ID dari {os.path.basename(found_file)} ({found_file})")
             except Exception as e:
-                print(f"[!] Gagal membaca id_spesifik.txt: {e}")
+                print(f"[!] Gagal membaca berkas {found_file}: {e}")
                 return
         else:
             print("[!] Berkas id_spesifik.txt tidak ditemukan!")
+            print("    Pastikan berkas 'id_spesifik.txt' diletakkan di dalam folder 'approve/' atau di folder utama.")
             return
 
     elif pilihan == '5':

@@ -147,6 +147,14 @@ python3 main.py approve
 
 ---
 
+### Opsi Menu 4: Baca dari Berkas `id_spesifik.txt`
+Jika Anda sudah memiliki daftar ID assignment tertentu yang ingin diapprove:
+1. Buat berkas bernama **`id_spesifik.txt`** (bisa diletakkan di dalam folder `approve/` atau di folder utama repositori).
+2. Isi satu ID assignment per baris. Template contoh tersedia di `approve/id_spesifik.example.txt`.
+3. Pilih **Menu 4** saat menjalankan script, sistem akan memuat seluruh baris ID tersebut dan langsung mengeksekusi persetujuan melalui akun Pengawas.
+
+---
+
 ## 📝 Penjelasan Status Hasil & Logging
 
 * **`[SUKSES]`**: Dokumen berhasil di-approve (HTTP 200/201).
