@@ -25,5 +25,7 @@ reject/id_spesifik.txt
 approve/credentials.json
 credentials.json
 *.secret.json
+tandai-selesai/curl.txt
+tandai-selesai/config.json
 
 

@@ -107,6 +107,11 @@ Bagi pengguna [mise](https://mise.jdx.dev/), versi Python Anda akan terkonfigura
 
 ## Cara Menjalankan Modul
 
+Modul **[tandai-selesai](tandai-selesai/README.md)** tersedia pada menu **10**.
+Isi `tandai-selesai/list.txt` dengan kode lengkap Sub SLS (satu kode per baris),
+salin cURL pencarian `assignment-region/datatable` ke `tandai-selesai/curl.txt`,
+lalu jalankan `python main.py tandai-selesai` untuk menandai listing selesai.
+
 Anda dapat menjalankan skrip modul melalui runner [main.py](main.py) dengan beberapa cara:
 
 ### 1. Menggunakan Menu Interaktif (Direkomendasikan)
@@ -128,6 +133,7 @@ python main.py tarik-data
 python main.py rekap
 python main.py change-mode
 python main.py dtsen
+python main.py tandai-selesai
 ```
 
 ### 3. Melihat Bantuan Langkah Persiapan (Sebelum Run Script)
@@ -138,6 +144,7 @@ python main.py help <nama_modul>
 Contoh perintah bantuan yang tersedia:
 ```bash
 python main.py help approve
+python main.py help tandai-selesai
 python main.py help reject
 python main.py help clear-assignment
 python main.py help clear-petugas

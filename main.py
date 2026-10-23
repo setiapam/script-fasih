@@ -45,6 +45,11 @@ MODULES = {
         "title": "Change Mode (Ubah Moda PAPI / CAPI / CAWI)",
         "desc": "Mengubah moda pengumpulan data sampel (PAPI/CAPI/CAWI) secara massal dari file Excel."
     },
+    "10": {
+        "name": "tandai-selesai",
+        "title": "Tandai Selesai (Listing Wilayah)",
+        "desc": "Mencari assignment wilayah dari list kode Sub SLS dan menandai listing selesai."
+    },
     "9": {
         "name": "dtsen",
         "title": "DTSEN (Update Status Pendataan DTSEN ke Excel)",
@@ -54,6 +59,13 @@ MODULES = {
 
 # Langkah-langkah persiapan sebelum menjalankan modul
 HELP_STEPS = {
+    "tandai-selesai": [
+        "1. Login FASIH BPS, buka Developer Tools (F12) -> Network.",
+        "2. Copy as cURL (bash) request assignment-region/datatable?periodeId=...",
+        "3. Paste ke tandai-selesai/curl.txt (contoh: curl.example.txt).",
+        "4. Isi tandai-selesai/list.txt dengan satu kode lengkap Sub SLS per baris.",
+        "5. Jalankan python main.py tandai-selesai, periksa target, lalu konfirmasi."
+    ],
     "approve": [
         "1. Login ke website FASIH BPS di browser Anda.",
         "2. Tekan F12 untuk membuka Developer Tools, lalu pilih tab 'Network'.",
@@ -146,7 +158,7 @@ def show_help(target_name=None):
                 print(f" {key}. {info['title']}")
             print(" q. Kembali ke menu utama")
             print("-" * 60)
-            choice = input("Masukkan pilihan bantuan (1/2/3/4/5/6/7/8/q): ").strip().lower()
+            choice = input("Masukkan nomor modul bantuan atau q: ").strip().lower()
             if choice == 'q':
                 break
             elif choice in MODULES:
@@ -200,7 +212,7 @@ def show_menu():
     print(" q. Keluar")
     print("-" * 60)
     
-    choice = input("Masukkan pilihan Anda (1/2/3/4/5/6/7/8/h/q): ").strip().lower()
+    choice = input("Masukkan nomor modul, h, atau q: ").strip().lower()
     if choice == 'q':
         print("[*] Selesai.")
         sys.exit(0)

@@ -1,0 +1,8 @@
+curl --url 'https://fasih-sm.bps.go.id/app/api/assignment-general/api/assignment-region/datatable?periodeId=fd68e454-ba45-4b85-8205-f3bf777ded24' \
+  -H 'Accept: */*' \
+  -H 'Content-Type: application/json' \
+  -b 'XSRF-TOKEN=GANTI_TOKEN; SESSION=GANTI_SESSION' \
+  -H 'Origin: https://fasih-sm.bps.go.id' \
+  -H 'Referer: https://fasih-sm.bps.go.id/app/surveys/a0429e96-51a5-477b-a415-485f9c153004/fd68e454-ba45-4b85-8205-f3bf777ded24/data?page=1&perPage=10' \
+  -H 'X-XSRF-TOKEN: GANTI_TOKEN' \
+  --data-raw '{"start":0,"length":5,"search":{"value":"3175040006000100","regex":true},"order":[{"column":0,"dir":"asc"}]}'
