@@ -18,6 +18,7 @@ warnings.filterwarnings('ignore', category=urllib3.exceptions.InsecureRequestWar
 BASE_REGION_URL = "https://fasih-sm.bps.go.id/app/api/region/api/v1/region"
 SSO_EKSTERNAL_AUTH = "https://fasih-sm.bps.go.id/oauth2/authorization/eksternal"
 SSO_BPS_AUTH = "https://fasih-sm.bps.go.id/app/auth/login"
+SUBMITTED_STATUS_ALIAS = "SUBMITTED BY Pencacah"
 
 def is_session_expired_response(response):
     """Mendeteksi apakah response menandakan sesi login / cURL sudah kadaluarsa."""
@@ -281,17 +282,7 @@ def extract_submitted_ids_from_items(data_list):
             continue
 
         status_alias = str(item.get('assignmentStatusAlias') or item.get('status') or '').strip().upper()
-        status_id = item.get('assignmentStatusId')
-        
-        is_submitted = False
-        if 'SUBMIT' in status_alias and 'APPROV' not in status_alias and 'REJECT' not in status_alias:
-            is_submitted = True
-        elif status_id in (2, 3):
-            is_submitted = True
-        elif not status_alias and status_id is None:
-            is_submitted = True
-
-        if is_submitted:
+        if status_alias == SUBMITTED_STATUS_ALIAS.upper():
             valid_ids.append({
                 "id": item_id,
                 "nama": item.get("data1", "-")
@@ -308,6 +299,8 @@ def main():
     # 1. Siapkan Sesi Pengawas (Eksekutor Approval)
     session_approver = None
     headers_approver = None
+    parsed_curl = None
+    curl_file = os.environ.get("APPROVE_CURL_FILE", "curl.txt")
     survey_period_id = None
     datatable_url = "https://fasih-sm.bps.go.id/app/api/analytic/api/v2/assignment/datatable-all-user-survey-periode"
 
@@ -340,9 +333,9 @@ def main():
 
     # Fallback / Model sebelumnya: Membaca approve/curl.txt
     if not headers_approver:
-        print("[*] Membaca sesi pengawas dari approve/curl.txt...")
+        print(f"[*] Membaca sesi pengawas dari {curl_file}...")
         try:
-            with open('curl.txt', 'r', encoding='utf-8') as f:
+            with open(curl_file, 'r', encoding='utf-8') as f:
                 curl_content = f.read().strip()
         except FileNotFoundError:
             print("[!] File curl.txt maupun approver_account di credentials.json tidak ditemukan!")
@@ -427,7 +420,7 @@ def main():
 
     if 'assignmentExtraParam' not in base_payload:
         base_payload['assignmentExtraParam'] = {}
-    base_payload['assignmentExtraParam']['assignmentStatusAlias'] = "SUBMITTED BY PPL"
+    base_payload['assignmentExtraParam']['assignmentStatusAlias'] = SUBMITTED_STATUS_ALIAS
     if survey_period_id and not base_payload['assignmentExtraParam'].get('surveyPeriodId'):
         base_payload['assignmentExtraParam']['surveyPeriodId'] = survey_period_id
 
@@ -569,7 +562,7 @@ def main():
 
     elif pilihan == '2':
         print("\n[*] Menjalankan penarikan data ID assignment dari API DataTables (curl.txt)...")
-        start = base_payload.get('start', 0)
+        start = 0
         length = base_payload.get('length', 100) or 100
         page = 1
 
@@ -577,7 +570,7 @@ def main():
             base_payload['start'] = start
             base_payload['length'] = length
             try:
-                response = requests.post(datatable_url, headers=headers_approver, json=base_payload, verify=False, timeout=30)
+                response = (session_approver or requests).post(datatable_url, headers=headers_approver, json=base_payload, verify=False, timeout=30)
                 if is_session_expired_response(response):
                     show_session_expired_banner("approve/curl.txt")
                     return
@@ -693,7 +686,7 @@ def main():
         }
 
         try:
-            response = requests.post(url_approval, headers=headers_approver, json=payload, verify=False, timeout=15)
+            response = (session_approver or requests).post(url_approval, headers=headers_approver, json=payload, verify=False, timeout=15)
             
             if is_session_expired_response(response):
                 msg = f" -> [ERROR AUTH] Sesi login pengawas kadaluarsa saat approve ID {assignment_id}."
