@@ -246,3 +246,25 @@ bisa kedaluwarsa dan perlu diperbarui dari browser akun masing-masing.
 * **`[ERROR AUTH]`**: Sesi pengawas kedaluwarsa. Perbarui sesi pengawas pada berkas cURL yang dipakai, atau login kembali jika memakai kredensial.
 * **`ids.json`** menyimpan daftar target, bukan checkpoint keberhasilan. Sebelum menjalankan ulang setelah proses terputus, periksa log dan status terbaru agar daftar ulang hanya berisi target yang masih perlu di-approve.
 * Daftar DataTables dapat terlambat mencerminkan hasil approval. Tunggu sebentar lalu periksa ulang status melalui akun admin.
+
+
+## Laporan Excel setiap eksekusi
+
+Setiap pemanggilan modul menghasilkan `laporan_eksekusi_approve.xlsx` di folder modul,
+dengan sheet **Ringkasan** dan **Hasil**. Sheet Hasil memuat ID target, nama, wilayah,
+periode (jika tersedia), status, keterangan, kode HTTP (jika tersedia), dan waktu.
+Status membedakan `BERHASIL`, `GAGAL`, `ERROR`, `SESI EXPIRED`, `DILEWATI`,
+dan `BELUM DIPROSES`. Keluaran khusus modul yang sudah ada tetap dipertahankan.
+
+Laporan diperbarui saat hasil tiap target dicatat, termasuk ketika sesi habis
+atau proses dihentikan dengan Ctrl+C. Target yang belum mendapat hasil tetap
+bertanda `BELUM DIPROSES`; status ini tidak berarti berhasil atau gagal. Jika
+persiapan gagal sebelum daftar target terbaca, laporan berisi ringkasan dengan
+nol target.
+
+Berkas di atas menunjukkan eksekusi terbaru. Salinan setiap eksekusi disimpan
+di `reports/` dalam folder modul dengan nama bertanggal dan waktu, sehingga
+riwayat sebelumnya tetap tersedia. Laporan merupakan catatan hasil menurut
+respons API atau cache saat eksekusi, bukan pemeriksaan ulang status server
+dan bukan checkpoint untuk mengulang aksi secara otomatis. Berkas hasil
+dikecualikan dari Git karena dapat memuat data penugasan.

@@ -87,3 +87,25 @@ cd tarik-data && python hit_endpoint.py
 - **Database wilayah (`region_db.json`) diperbarui secara incremental**. Jika Anda mengganti/menambah list target di `subsls_target.xlsx`, script akan secara cerdas hanya men-download wilayah baru yang belum ada di cache. Anda tidak perlu menghapus database lokal atau menjawab prompt interaktif.
 - Jika session/token expired, cukup **update file `curl.txt`** dengan cURL datatable yang baru dari browser.
 - File `result.xlsx` akan **ditimpa** setiap kali script dijalankan. Backup terlebih dahulu jika data hasil ekstraksi sebelumnya masih diperlukan.
+
+
+## Laporan Excel setiap eksekusi
+
+Setiap pemanggilan modul menghasilkan `laporan_eksekusi_tarik_data.xlsx` di folder modul,
+dengan sheet **Ringkasan** dan **Hasil**. Sheet Hasil memuat ID target, nama, wilayah,
+periode (jika tersedia), status, keterangan, kode HTTP (jika tersedia), dan waktu.
+Status membedakan `BERHASIL`, `GAGAL`, `ERROR`, `SESI EXPIRED`, `DILEWATI`,
+dan `BELUM DIPROSES`. Keluaran khusus modul yang sudah ada tetap dipertahankan.
+
+Laporan diperbarui saat hasil tiap target dicatat, termasuk ketika sesi habis
+atau proses dihentikan dengan Ctrl+C. Target yang belum mendapat hasil tetap
+bertanda `BELUM DIPROSES`; status ini tidak berarti berhasil atau gagal. Jika
+persiapan gagal sebelum daftar target terbaca, laporan berisi ringkasan dengan
+nol target.
+
+Berkas di atas menunjukkan eksekusi terbaru. Salinan setiap eksekusi disimpan
+di `reports/` dalam folder modul dengan nama bertanggal dan waktu, sehingga
+riwayat sebelumnya tetap tersedia. Laporan merupakan catatan hasil menurut
+respons API atau cache saat eksekusi, bukan pemeriksaan ulang status server
+dan bukan checkpoint untuk mengulang aksi secara otomatis. Berkas hasil
+dikecualikan dari Git karena dapat memuat data penugasan.

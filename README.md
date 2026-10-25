@@ -356,3 +356,56 @@ Untuk melihat instruksi spesifik cara mendapatkan token cURL dan detail teknis m
 * **[Dokumentasi Modul DTSEN](dtsen/README.md)**
 
 
+
+
+## Laporan Excel seluruh modul
+
+Semua modul menghasilkan laporan eksekusi standar di foldernya masing-masing:
+
+| Modul | Laporan eksekusi terbaru |
+| --- | --- |
+| `approve` | `approve/laporan_eksekusi_approve.xlsx` |
+| `reject` | `reject/laporan_eksekusi_reject.xlsx` |
+| `clear-assignment` | `clear-assignment/laporan_eksekusi_clear_assignment.xlsx` |
+| `clear-petugas` | `clear-petugas/laporan_eksekusi_clear_petugas.xlsx` |
+| `assign` | `assign/laporan_eksekusi_assign.xlsx` |
+| `change-mode` | `change-mode/laporan_eksekusi_change_mode.xlsx` |
+| `dtsen` | `dtsen/laporan_eksekusi_dtsen.xlsx` |
+| `tarik-data` | `tarik-data/laporan_eksekusi_tarik_data.xlsx` |
+| `rekap` | `rekap/laporan_eksekusi_rekap.xlsx` |
+| `tandai-selesai` | `tandai-selesai/laporan_eksekusi_tandai_selesai.xlsx` |
+
+Setiap laporan berisi sheet **Ringkasan** dan **Hasil** per target: ID, nama,
+wilayah, periode, status, keterangan, HTTP, dan waktu (sesuai data yang tersedia).
+Laporan disimpan sejak persiapan dan diperbarui setiap ada hasil. Sesi habis,
+kegagalan, Ctrl+C, dan target yang belum diproses tetap dapat dibedakan.
+Jika daftar target belum terbaca, laporan hanya berisi ringkasan nol target.
+
+Salinan setiap eksekusi disimpan dalam `<modul>/reports/` dengan waktu pada nama
+berkas. Laporan terbaru tidak menghapus arsip eksekusi sebelumnya. Keluaran
+khusus yang sudah ada (CSV assign, Excel rekap, hasil tarik-data, perubahan mode,
+listing, dan pembaruan Excel DTSEN) tetap dipertahankan.
+
+Laporan merekam respons API atau hasil cache pada saat eksekusi, bukan status
+terkini server. Gunakan log dan pemeriksaan ulang target sebelum mengulang aksi.
+Semua laporan standar dan folder arsip dikecualikan dari Git.
+
+
+### Berkas lokal yang dikecualikan dari Git
+
+Laporan Excel/CSV, arsip `reports/`, log, `ids.json`, `config.json`,
+`completed_*.json`, `progress.json`, cache CSV assign, dan sesi `*.curl`
+merupakan berkas lokal. Berkas runtime lama yang sebelumnya terlacak sudah
+dikeluarkan dari indeks Git; file pada komputer tetap dipertahankan.
+Template input Excel dan database referensi wilayah tetap disertakan.
+
+Contoh konfigurasi kosong tersedia sebagai `<modul>/config.example.json`,
+dan contoh daftar ID kosong sebagai `<modul>/ids.example.json`. Jika perlu
+menyiapkan konfigurasi sebelum menjalankan modul, salin contoh lalu isi periode:
+
+```bash
+cp approve/config.example.json approve/config.json
+```
+
+Modul juga membuat atau memperbarui state lokal sesuai alur eksekusinya.
+Jangan menambahkan hasil eksekusi, kredensial, atau cookie aktif dengan `git add -f`.

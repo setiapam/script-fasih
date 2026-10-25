@@ -28,4 +28,26 @@ credentials.json
 tandai-selesai/curl.txt
 tandai-selesai/config.json
 
+# Laporan hasil eksekusi lokal (termasuk data penugasan)
+**/laporan_eksekusi_*.xlsx
+**/reports/
 
+# Laporan lama/khusus modul dan berkas sementara Excel
+**/laporan_hasil_*.xlsx
+**/laporan_hasil_*.csv
+**/hasil_rekap.xlsx
+**/.report-*.xlsx
+**/*.tmp.xlsx
+~$*.xlsx
+
+# State eksekusi dan cache yang dibuat/diperbarui modul
+**/ids.json
+**/config.json
+**/completed_*.json
+**/progress.json
+assign/data_pencacah.csv
+assign/data_pengawas.csv
+assign/data_sampel.csv
+
+# Sesi browser lokal dari alur dua akun
+*.curl

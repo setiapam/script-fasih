@@ -68,3 +68,25 @@ python main.py clear-petugas
 * **`[ERROR]`**: Terjadi masalah teknis atau gangguan koneksi saat pemanggilan API.
 
 Seluruh riwayat eksekusi akan dicatat secara otomatis ke berkas `execution.log` di dalam folder ini (diabaikan dari Git).
+
+
+## Laporan Excel setiap eksekusi
+
+Setiap pemanggilan modul menghasilkan `laporan_eksekusi_clear_petugas.xlsx` di folder modul,
+dengan sheet **Ringkasan** dan **Hasil**. Sheet Hasil memuat ID target, nama, wilayah,
+periode (jika tersedia), status, keterangan, kode HTTP (jika tersedia), dan waktu.
+Status membedakan `BERHASIL`, `GAGAL`, `ERROR`, `SESI EXPIRED`, `DILEWATI`,
+dan `BELUM DIPROSES`. Keluaran khusus modul yang sudah ada tetap dipertahankan.
+
+Laporan diperbarui saat hasil tiap target dicatat, termasuk ketika sesi habis
+atau proses dihentikan dengan Ctrl+C. Target yang belum mendapat hasil tetap
+bertanda `BELUM DIPROSES`; status ini tidak berarti berhasil atau gagal. Jika
+persiapan gagal sebelum daftar target terbaca, laporan berisi ringkasan dengan
+nol target.
+
+Berkas di atas menunjukkan eksekusi terbaru. Salinan setiap eksekusi disimpan
+di `reports/` dalam folder modul dengan nama bertanggal dan waktu, sehingga
+riwayat sebelumnya tetap tersedia. Laporan merupakan catatan hasil menurut
+respons API atau cache saat eksekusi, bukan pemeriksaan ulang status server
+dan bukan checkpoint untuk mengulang aksi secara otomatis. Berkas hasil
+dikecualikan dari Git karena dapat memuat data penugasan.

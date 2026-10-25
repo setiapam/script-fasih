@@ -187,6 +187,16 @@ def save_report(results):
     temporary.replace(path)
 
 
+# Helper bersama juga tersedia saat modul dijalankan langsung.
+from pathlib import Path as _ReportPath
+import sys as _report_sys
+_report_root = str(_ReportPath(__file__).resolve().parents[1])
+if _report_root not in _report_sys.path:
+    _report_sys.path.insert(0, _report_root)
+from execution_report import with_report, prepare_report, record_result
+
+
+@with_report("tandai-selesai")
 def main():
     print('=' * 60)
     print('          TANDAI SELESAI LISTING WILAYAH')
@@ -204,6 +214,7 @@ def main():
     print(f'Periode: {period}\nTarget dari list.txt: {len(targets)} wilayah')
     for code in targets:
         print(f' - {code}')
+    prepare_report([{'id': code, 'wilayah': code} for code in targets], period)
     if input('Tandai listing selesai untuk daftar ini? (y/N): ').strip().lower() != 'y':
         print('[*] Dibatalkan.')
         return
@@ -244,6 +255,10 @@ def main():
             finally:
                 report['Waktu'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 save_report(results)
+                execution_status = {'Berhasil': 'BERHASIL', 'Gagal': 'GAGAL',
+                                    'Sudah selesai': 'DILEWATI', 'Sesi expired': 'SESI EXPIRED'}
+                record_result(code, execution_status.get(report['Status'], 'BELUM DIPROSES'),
+                              report.get('Keterangan', ''))
             time.sleep(0.3)
     except SessionExpiredException as exc:
         log_message(f'[SESI EXPIRED] {exc} Perbarui tandai-selesai/curl.txt lalu jalankan ulang.')

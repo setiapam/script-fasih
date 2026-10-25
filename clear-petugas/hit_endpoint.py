@@ -149,6 +149,16 @@ def alternate_emails(petugas_emails, pengawas_emails):
             j += 1
     return alternated
 
+# Helper bersama juga tersedia saat modul dijalankan langsung.
+from pathlib import Path as _ReportPath
+import sys as _report_sys
+_report_root = str(_ReportPath(__file__).resolve().parents[1])
+if _report_root not in _report_sys.path:
+    _report_sys.path.insert(0, _report_root)
+from execution_report import with_report, prepare_report, record_result
+
+
+@with_report("clear-petugas")
 def main():
     print("=" * 60)
     print("           CLEAR ASSIGNMENT AUTOMATION SCRIPT")
@@ -351,6 +361,7 @@ def main():
     print("=" * 50)
 
     # Konfirmasi sebelum delete
+    prepare_report([{"id": f"{t['allocationId']}:{t['regionCode']}", "nama": t.get("email"), "wilayah": t.get("regionCode")} for t in all_targets], survey_period_id)
     confirm = input(f"\nApakah Anda yakin ingin menghapus {len(all_targets)} assignment ini? (y/N): ").strip().lower()
     if confirm != 'y':
         print("[*] Dibatalkan oleh pengguna.")
@@ -376,6 +387,7 @@ def main():
         reg_code = target.get('regionCode')
         email = target.get('email')
         reg_name = target.get('regionName', '-')
+        report_key = f'{alloc_id}:{reg_code}'
         
         log_msg = f"[{idx+1}/{len(all_targets)}] Menghapus {email} | Region: {reg_name} ({reg_code}) ... "
         print(log_msg, end="")
@@ -394,6 +406,7 @@ def main():
                 print(msg)
                 with open(log_file, "a", encoding="utf-8") as lf:
                     lf.write(msg + "\n")
+                record_result(report_key, "SESI EXPIRED", "Sesi kedaluwarsa.", response.status_code)
                 show_session_expired_banner(module_curl_path="clear-petugas/curl.txt", completed_count=total_deleted, total_count=len(all_targets))
                 break
 
@@ -401,10 +414,12 @@ def main():
                 msg = f"[SUKSES] (Status: {response.status_code})"
                 print(msg)
                 total_deleted += 1
+                record_result(report_key, "BERHASIL", "Alokasi petugas dihapus.", response.status_code)
             else:
                 msg = f"[GAGAL] (Status: {response.status_code})"
                 print(msg)
                 total_failed += 1
+                record_result(report_key, "GAGAL", response.text[:500], response.status_code)
                 failed_details.append({
                     "email": email,
                     "region": f"{reg_name} ({reg_code})",
@@ -416,6 +431,7 @@ def main():
             msg = f"[ERROR] ({e})"
             print(msg)
             total_failed += 1
+            record_result(report_key, "ERROR", str(e))
             failed_details.append({
                 "email": email,
                 "region": f"{reg_name} ({reg_code})",

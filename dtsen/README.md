@@ -56,3 +56,25 @@ python main.py dtsen /home/murphi/Documents/dtsen_koja.xlsx --reset
 * **Resumable**: Baris yang sudah memiliki status `sdh didata` atau `blm didata` akan otomatis dilewati saat script dijalankan kembali.
 * **Batch Auto-Save**: Excel disimpan secara berkala tiap 50 baris dan saat proses diinterupsi (`Ctrl+C`) sehingga progress tidak hilang.
 * **Session Expired Banner**: Jika sesi login FASIH habis, banner informatif muncul dan progres yang tersimpan tetap aman.
+
+
+## Laporan Excel setiap eksekusi
+
+Setiap pemanggilan modul menghasilkan `laporan_eksekusi_dtsen.xlsx` di folder modul,
+dengan sheet **Ringkasan** dan **Hasil**. Sheet Hasil memuat ID target, nama, wilayah,
+periode (jika tersedia), status, keterangan, kode HTTP (jika tersedia), dan waktu.
+Status membedakan `BERHASIL`, `GAGAL`, `ERROR`, `SESI EXPIRED`, `DILEWATI`,
+dan `BELUM DIPROSES`. Keluaran khusus modul yang sudah ada tetap dipertahankan.
+
+Laporan diperbarui saat hasil tiap target dicatat, termasuk ketika sesi habis
+atau proses dihentikan dengan Ctrl+C. Target yang belum mendapat hasil tetap
+bertanda `BELUM DIPROSES`; status ini tidak berarti berhasil atau gagal. Jika
+persiapan gagal sebelum daftar target terbaca, laporan berisi ringkasan dengan
+nol target.
+
+Berkas di atas menunjukkan eksekusi terbaru. Salinan setiap eksekusi disimpan
+di `reports/` dalam folder modul dengan nama bertanggal dan waktu, sehingga
+riwayat sebelumnya tetap tersedia. Laporan merupakan catatan hasil menurut
+respons API atau cache saat eksekusi, bukan pemeriksaan ulang status server
+dan bukan checkpoint untuk mengulang aksi secara otomatis. Berkas hasil
+dikecualikan dari Git karena dapat memuat data penugasan.

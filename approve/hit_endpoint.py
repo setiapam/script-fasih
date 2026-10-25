@@ -290,6 +290,16 @@ def extract_submitted_ids_from_items(data_list):
 
     return valid_ids
 
+# Helper bersama juga tersedia saat modul dijalankan langsung.
+from pathlib import Path as _ReportPath
+import sys as _report_sys
+_report_root = str(_ReportPath(__file__).resolve().parents[1])
+if _report_root not in _report_sys.path:
+    _report_sys.path.insert(0, _report_root)
+from execution_report import with_report, prepare_report, record_result
+
+
+@with_report("approve")
 def main():
     print("=" * 60)
     print("           BULK APPROVAL AUTOMATION SCRIPT")
@@ -653,6 +663,7 @@ def main():
         json.dump(unique_targets, f, indent=2)
 
     print(f"\n[?] Siap melakukan approval massal untuk {len(unique_targets)} assignment (STATUS: SUBMITTED ONLY).")
+    prepare_report(unique_targets, survey_period_id)
     confirm = input(f"Apakah Anda yakin ingin menyetujui (approve) {len(unique_targets)} assignment ini via akun Pengawas? (Y/n): ").strip().lower()
     if confirm == 'n':
         print("[*] Dibatalkan oleh pengguna.")
@@ -692,6 +703,7 @@ def main():
                 msg = f" -> [ERROR AUTH] Sesi login pengawas kadaluarsa saat approve ID {assignment_id}."
                 print(msg)
                 with open(log_file, "a", encoding="utf-8") as lf: lf.write(msg + "\n")
+                record_result(assignment_id, "SESI EXPIRED", "Sesi pengawas kedaluwarsa.", response.status_code)
                 show_session_expired_banner("approve/curl.txt", completed_count=total_success, total_count=len(unique_targets))
                 break
 
@@ -699,11 +711,13 @@ def main():
                 msg = f"[{idx+1}/{len(unique_targets)}] [SUKSES] ID: {assignment_id} | {nama}"
                 print(msg)
                 total_success += 1
+                record_result(assignment_id, "BERHASIL", "Approval berhasil.", response.status_code)
             else:
                 resp_text = response.text[:120]
                 msg = f"[{idx+1}/{len(unique_targets)}] [GAGAL] ID: {assignment_id} | {nama} -> {resp_text}"
                 print(msg)
                 total_failed += 1
+                record_result(assignment_id, "GAGAL", resp_text, response.status_code)
                 failed_details.append({"id": assignment_id, "reason": resp_text})
 
             with open(log_file, "a", encoding="utf-8") as lf:
@@ -716,6 +730,7 @@ def main():
             print(msg)
             with open(log_file, "a", encoding="utf-8") as lf: lf.write(msg + "\n")
             total_failed += 1
+            record_result(assignment_id, "ERROR", str(e))
             failed_details.append({"id": assignment_id, "reason": str(e)})
 
     summary_lines = []

@@ -1093,6 +1093,16 @@ def _to_int(value):
 # ============================================================
 #  MAIN: Alur Utama
 # ============================================================
+# Helper bersama juga tersedia saat modul dijalankan langsung.
+from pathlib import Path as _ReportPath
+import sys as _report_sys
+_report_root = str(_ReportPath(__file__).resolve().parents[1])
+if _report_root not in _report_sys.path:
+    _report_sys.path.insert(0, _report_root)
+from execution_report import with_report, prepare_report, record_result
+
+
+@with_report("rekap")
 def main():
     print("=" * 60)
     print("   MODUL REKAP PROGRESS PETUGAS - FASIH BPS")
@@ -1143,6 +1153,12 @@ def main():
     else:
         progress = {'results': {}}
 
+    prepare_report([{"id": p['email'], "nama": p.get('nama')}
+                    for p in petugas_list], survey_period_id)
+    for email in already_done:
+        if any(p['email'] == email for p in petugas_list):
+            record_result(email, "DILEWATI", "Data dari cache progress sebelumnya.")
+
     # ---- 4. Proses Fetch Data Progress ----
     print(f"\n[4/4] Mengambil data progress dari API...")
     print("-" * 60)
@@ -1186,6 +1202,7 @@ def main():
                 }
                 already_done.add(email)
                 success_count += 1
+                record_result(email, "BERHASIL", "Data rekap berhasil diambil.")
 
                 total_asgn = summary_res.get('totalAssignment', 0)
                 n_regions = len(regions_res)
@@ -1203,6 +1220,7 @@ def main():
                     'timestamp': datetime.now().isoformat(),
                 }
                 already_done.add(email)
+                record_result(email, "BERHASIL", "Data kosong / tidak ditemukan.")
                 print("⚠ Data kosong / tidak ditemukan")
         else:
             if error_msg == "SESSION_EXPIRED":
@@ -1213,6 +1231,7 @@ def main():
                 }
                 fail_count += 1
                 session_expired = True
+                record_result(email, "SESI EXPIRED", "Sesi kedaluwarsa.")
                 print("❌ SESSION HABIS!")
                 log_message(f"Session expired saat memproses: {email}")
 
@@ -1235,6 +1254,7 @@ def main():
                     'timestamp': datetime.now().isoformat(),
                 }
                 fail_count += 1
+                record_result(email, "ERROR", error_msg)
                 print(f"❌ Error: {error_msg}")
                 log_message(f"Error untuk {email}: {error_msg}")
 
@@ -1247,7 +1267,7 @@ def main():
     save_progress(progress)
 
     # ---- 5. Generate Output Excel ----
-    if not session_expired or success_count > 0 or len(already_done) > 0:
+    if petugas_list:
         print(f"\n[*] Membuat file output Excel...")
         write_output_excel(petugas_list, progress['results'], OUTPUT_FILE)
 

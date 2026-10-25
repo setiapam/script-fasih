@@ -451,6 +451,16 @@ def evaluate_dtsen_rules(search_results, target_name="", target_alamat=""):
     return "sdh didata", "ditemukan lebih dari 1 row"
 
 
+# Helper bersama juga tersedia saat modul dijalankan langsung.
+from pathlib import Path as _ReportPath
+import sys as _report_sys
+_report_root = str(_ReportPath(__file__).resolve().parents[1])
+if _report_root not in _report_sys.path:
+    _report_sys.path.insert(0, _report_root)
+from execution_report import with_report, prepare_report, record_result
+
+
+@with_report("dtsen")
 def main():
     print("=" * 60)
     print("      MODUL AUTOMATION: DTSEN FASIH BPS")
@@ -556,6 +566,10 @@ def main():
         lf.write(f"Excel target: {excel_path}\n")
         lf.write(f"==================================================\n")
 
+    prepare_report([{"id": str(i), "nama": ws.cell(i, 7).value,
+                     "wilayah": ws.cell(i, 3).value}
+                    for i in range(2, ws.max_row + 1)], survey_period_id)
+
     # 4. Memproses Baris Data
     total_rows = ws.max_row
     print(f"[*] Total baris pada sheet: {total_rows}")
@@ -581,11 +595,13 @@ def main():
 
             # Jika sudah pernah diproses dan terisi, lewati (resumable)
             if val_col_i and str(val_col_i).strip() in ("sdh didata", "blm didata"):
+                record_result(str(row_idx), "DILEWATI", "Hasil sudah terisi dari eksekusi sebelumnya.")
                 skipped += 1
                 sukses += 1
                 continue
 
             if not nama_anggota or str(nama_anggota).strip() == "":
+                record_result(str(row_idx), "BERHASIL", "Nama anggota kosong; ditandai blm didata.")
                 # Tidak ada nama anggota
                 ws.cell(row=row_idx, column=9, value="blm didata")
                 ws.cell(row=row_idx, column=10, value="")
@@ -599,6 +615,7 @@ def main():
                 msg = f"Baris {row_idx} | Kelurahan '{nama_kel}' ({kode_kel}) tidak ditemukan di region database."
                 print(f"[GAGAL] {msg}")
                 gagal += 1
+                record_result(str(row_idx), "GAGAL", msg)
                 failed_details.append({"baris": row_idx, "nama": nama_search, "alasan": msg})
                 continue
 
@@ -606,6 +623,7 @@ def main():
             status_code, results = query_fasih_datatable(headers, datatable_url, survey_period_id, region4_id, nama_search)
 
             if status_code == 401 or status_code == 403:
+                record_result(str(row_idx), "SESI EXPIRED", "Sesi kedaluwarsa.", status_code)
                 show_session_expired_banner(completed_count=sukses, total_count=total_target)
                 wb.save(excel_path)
                 print(f"[*] Progress berhasil disimpan ke '{excel_path}'.")
@@ -615,6 +633,7 @@ def main():
                 msg = f"Baris {row_idx} | HTTP Error {status_code} saat mencari '{nama_search}'"
                 print(f"[ERROR] {msg}")
                 gagal += 1
+                record_result(str(row_idx), "ERROR", msg, status_code)
                 failed_details.append({"baris": row_idx, "nama": nama_search, "alasan": msg})
                 time.sleep(1)
                 continue
@@ -625,6 +644,7 @@ def main():
             ws.cell(row=row_idx, column=9, value=status_i)
             ws.cell(row=row_idx, column=10, value=status_j)
             sukses += 1
+            record_result(str(row_idx), "BERHASIL", f"{status_i}; {status_j}", status_code)
 
             print(f"[SUKSES] Baris {row_idx}/{total_rows} | {nama_search} ({nama_kel}) -> Col I: '{status_i}' | Col J: '{status_j}' (Hits: {len(results)})")
 

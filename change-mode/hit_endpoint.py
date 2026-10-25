@@ -311,6 +311,16 @@ def detect_columns(df):
     return col_sampel, col_perusahaan, col_mode
 
 # ================= EKSEKUSI UTAMA =================
+# Helper bersama juga tersedia saat modul dijalankan langsung.
+from pathlib import Path as _ReportPath
+import sys as _report_sys
+_report_root = str(_ReportPath(__file__).resolve().parents[1])
+if _report_root not in _report_sys.path:
+    _report_sys.path.insert(0, _report_root)
+from execution_report import with_report, prepare_report, record_result, ReportResults
+
+
+@with_report("change-mode")
 def main():
     print("=" * 60)
     print("        CHANGE MODE (PAPI / CAPI / CAWI) AUTOMATION")
@@ -464,7 +474,9 @@ def main():
 
     sukses = 0
     gagal = 0
-    log_results = []
+    prepare_report([{"id": str(value).strip().removesuffix('.0')}
+                    for value in df[col_sampel] if pd.notna(value) and str(value).strip()], survey_period_id)
+    log_results = ReportResults()
     failed_details = []
     session_expired_detected = False
 
@@ -543,6 +555,7 @@ def main():
                 print(f" -> [ERROR AUTH] {e}")
                 with open(log_file, "a", encoding="utf-8") as lf:
                     lf.write(f" -> [ERROR AUTH] {e}\n")
+                record_result(sampel_excel, "SESI EXPIRED", "Sesi kedaluwarsa saat pencarian.")
                 show_session_expired_banner(
                     module_curl_path="change-mode/curl.txt",
                     completed_count=sukses,
@@ -581,6 +594,7 @@ def main():
                 print(msg)
                 with open(log_file, "a", encoding="utf-8") as lf:
                     lf.write(msg + "\n")
+                record_result(sampel_excel, "SESI EXPIRED", "Sesi kedaluwarsa saat mengubah mode.", response.status_code)
                 show_session_expired_banner(
                     module_curl_path="change-mode/curl.txt",
                     completed_count=sukses,

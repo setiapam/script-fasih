@@ -147,6 +147,16 @@ def extract_survey_period_id(parsed_curl, raw_curl_content=""):
 
     return ""
 
+# Helper bersama juga tersedia saat modul dijalankan langsung.
+from pathlib import Path as _ReportPath
+import sys as _report_sys
+_report_root = str(_ReportPath(__file__).resolve().parents[1])
+if _report_root not in _report_sys.path:
+    _report_sys.path.insert(0, _report_root)
+from execution_report import with_report, prepare_report, record_result
+
+
+@with_report("reject")
 def main():
     print("=" * 60)
     print("           BULK REJECT AUTOMATION SCRIPT")
@@ -359,6 +369,7 @@ def main():
         return
 
     print(f"\\n[?] Siap melakukan reject massal untuk {len(all_ids)} assignment.")
+    prepare_report([{"id": item} for item in all_ids], survey_period_id)
     confirm = input(f"Apakah Anda yakin ingin menolak (reject) {len(all_ids)} assignment ini? (Y/n): ").strip().lower()
     if confirm == 'n':
         print("[*] Dibatalkan oleh pengguna.")
@@ -413,6 +424,7 @@ def main():
                 print(msg)
                 with open(log_file, "a", encoding="utf-8") as lf:
                     lf.write(msg + "\n")
+                record_result(assignment_id, "SESI EXPIRED", "Sesi pengawas kedaluwarsa.", response.status_code)
                 show_session_expired_banner(module_curl_path="reject/curl.txt", completed_count=total_success, total_count=len(all_ids))
                 break
 
@@ -420,10 +432,12 @@ def main():
                 msg = f" -> [SUKSES] Status HTTP: {response.status_code}"
                 print(msg)
                 total_success += 1
+                record_result(assignment_id, "BERHASIL", "Reject berhasil.", response.status_code)
             else:
                 msg = f" -> [GAGAL] Status HTTP: {response.status_code}"
                 print(msg)
                 total_failed += 1
+                record_result(assignment_id, "GAGAL", response.text[:500], response.status_code)
                 failed_details.append({"id": assignment_id, "reason": f"Status HTTP {response.status_code}"})
 
             with open(log_file, "a", encoding="utf-8") as lf:
@@ -449,6 +463,7 @@ def main():
             with open(log_file, "a", encoding="utf-8") as lf:
                 lf.write(msg + "\\n")
             total_failed += 1
+            record_result(assignment_id, "ERROR", str(e))
             failed_details.append({"id": assignment_id, "reason": f"RequestException: {e}"})
             print("-" * 40)
 

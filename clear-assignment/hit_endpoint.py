@@ -132,6 +132,16 @@ def detect_curl_type(parsed_curl):
             return 'clear'
     return None
 
+# Helper bersama juga tersedia saat modul dijalankan langsung.
+from pathlib import Path as _ReportPath
+import sys as _report_sys
+_report_root = str(_ReportPath(__file__).resolve().parents[1])
+if _report_root not in _report_sys.path:
+    _report_sys.path.insert(0, _report_root)
+from execution_report import with_report, prepare_report, record_result
+
+
+@with_report("clear-assignment")
 def main():
     print("=" * 60)
     print("           CLEAR ASSIGNMENT AUTOMATION SCRIPT")
@@ -327,6 +337,7 @@ def main():
         return
 
     print(f"\n[?] Siap melakukan clear untuk {len(all_ids)} assignment.")
+    prepare_report([{"id": item} for item in all_ids])
     confirm = input(f"Apakah Anda yakin ingin menghapus {len(all_ids)} assignment ini? (y/N): ").strip().lower()
     if confirm != 'y':
         print("[*] Dibatalkan oleh pengguna.")
@@ -368,6 +379,8 @@ def main():
                 print(msg)
                 with open(log_file, "a", encoding="utf-8") as lf:
                     lf.write(msg + "\n")
+                for item_id in batch:
+                    record_result(item_id, "SESI EXPIRED", "Sesi kedaluwarsa saat mengirim batch.", response.status_code)
                 show_session_expired_banner(module_curl_path="clear-assignment/curl_clear.txt", completed_count=total_cleared, total_count=len(all_ids))
                 break
 
@@ -375,11 +388,14 @@ def main():
                 msg = f" -> [SUKSES] Status HTTP: {response.status_code}"
                 print(msg)
                 total_cleared += len(batch)
+                for item_id in batch:
+                    record_result(item_id, "BERHASIL", "Batch clear diterima server.", response.status_code)
             else:
                 msg = f" -> [GAGAL] Status HTTP: {response.status_code}"
                 print(msg)
                 total_failed += len(batch)
                 for item_id in batch:
+                    record_result(item_id, "GAGAL", response.text[:500], response.status_code)
                     failed_details.append({"id": item_id, "reason": f"Batch HTTP {response.status_code}"})
                 
             with open(log_file, "a", encoding="utf-8") as lf:
@@ -404,6 +420,7 @@ def main():
                 lf.write(msg + "\n")
             total_failed += len(batch)
             for item_id in batch:
+                record_result(item_id, "ERROR", str(e))
                 failed_details.append({"id": item_id, "reason": f"Exception: {e}"})
             
     summary_lines = []

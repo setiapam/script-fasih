@@ -500,6 +500,16 @@ def fetch_approval_structure(headers, assignment_id):
 # ============================================================
 #  MAIN ENTRY POINT
 # ============================================================
+# Helper bersama juga tersedia saat modul dijalankan langsung.
+from pathlib import Path as _ReportPath
+import sys as _report_sys
+_report_root = str(_ReportPath(__file__).resolve().parents[1])
+if _report_root not in _report_sys.path:
+    _report_sys.path.insert(0, _report_root)
+from execution_report import with_report, prepare_report, record_result
+
+
+@with_report("tarik-data")
 def main():
     print("=" * 60)
     print("         TARIK DATA - FASIH BPS DATA EXTRACTOR")
@@ -657,6 +667,8 @@ def main():
 
     print(f"    Ditemukan {len(target_subsls_codes)} target sub SLS.")
 
+    prepare_report([{"id": code, "wilayah": code} for code in target_subsls_codes], survey_period_id)
+
     # --- LANGKAH 3: Bangun atau muat database region (hanya wilayah yang relevan) ---
     region_db = {}
     if os.path.exists(REGION_DB_FILE):
@@ -700,6 +712,7 @@ def main():
             valid_targets.append((code, region_ids))
         else:
             invalid_targets.append(code)
+            record_result(code, "GAGAL", "Kode Sub SLS tidak ditemukan di database wilayah.")
 
     if invalid_targets:
         print(f"\n[!] Peringatan: {len(invalid_targets)} kode sub SLS tidak ditemukan di API:")
@@ -766,6 +779,13 @@ def main():
                 pass
     failed_details = []
 
+    prepare_report([{"id": code, "wilayah": code,
+                     "nama": region_db.get(code, {}).get('name', '')}
+                    for code, _ in valid_targets], survey_period_id)
+    for code, _ in valid_targets:
+        if code in completed_set:
+            record_result(code, "DILEWATI", "Data sudah tersimpan dari eksekusi sebelumnya.")
+
     if not remaining_targets:
         print(f"\n[*] Semua {len(valid_targets)} target sub SLS sudah selesai diambil.")
     else:
@@ -805,12 +825,14 @@ def main():
                     print(msg)
                     with open(LOG_FILE, "a", encoding="utf-8") as lf:
                         lf.write(msg + "\n")
+                    record_result(subsls_code, "SESI EXPIRED", "Sesi kedaluwarsa.")
                     show_session_expired_banner(module_curl_path="tarik-data/curl.txt", completed_count=total_success, total_count=len(valid_targets))
                     break
                 elif error:
                     msg = f" -> [GAGAL] {error}"
                     print(msg)
                     total_failed += 1
+                    record_result(subsls_code, "GAGAL", error)
                     failed_details.append({
                         "subsls_code": subsls_code,
                         "subsls_name": subsls_name,
@@ -873,6 +895,7 @@ def main():
                     subsls_file = os.path.join(TEMP_DIR, f"{subsls_code}.json")
                     with open(subsls_file, "w", encoding="utf-8") as f:
                         json.dump(records, f, indent=2, ensure_ascii=False)
+                    record_result(subsls_code, "BERHASIL", f"{len(records)} record tersimpan.")
 
                     with open(LOG_FILE, "a", encoding="utf-8") as lf:
                         lf.write(msg + "\n")
@@ -886,6 +909,7 @@ def main():
                     subsls_file = os.path.join(TEMP_DIR, f"{subsls_code}.json")
                     with open(subsls_file, "w", encoding="utf-8") as f:
                         json.dump([], f, indent=2, ensure_ascii=False)
+                    record_result(subsls_code, "BERHASIL", "0 record tersimpan.")
                         
                     with open(LOG_FILE, "a", encoding="utf-8") as lf:
                         lf.write(msg + "\n")
@@ -894,6 +918,7 @@ def main():
                 msg = f" -> [ERROR] {e}"
                 print(msg)
                 total_failed += 1
+                record_result(subsls_code, "ERROR", str(e))
                 failed_details.append({
                     "subsls_code": subsls_code,
                     "subsls_name": subsls_name,

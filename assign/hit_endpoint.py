@@ -347,6 +347,16 @@ def save_dict_to_csv(data_dict, filename, col1_name, col2_name):
         df.to_csv(filename, index=False)
 
 # ================= EKSEKUSI UTAMA =================
+# Helper bersama juga tersedia saat modul dijalankan langsung.
+from pathlib import Path as _ReportPath
+import sys as _report_sys
+_report_root = str(_ReportPath(__file__).resolve().parents[1])
+if _report_root not in _report_sys.path:
+    _report_sys.path.insert(0, _report_root)
+from execution_report import with_report, prepare_report, record_result, ReportResults
+
+
+@with_report("assign")
 def main():
     print("Membaca konfigurasi file cURL...")
     
@@ -539,7 +549,9 @@ def main():
         
     sukses = 0
     gagal = 0
-    log_assignment = []
+    prepare_report([{"id": str(value).strip().removesuffix('.0')}
+                    for value in df[KOLOM_SAMPEL] if pd.notna(value) and str(value).strip()], survey_period_id)
+    log_assignment = ReportResults()
     failed_details = []
     
     print("\nMulai proses Assignment...")
@@ -611,6 +623,7 @@ def main():
             print(f" -> [ERROR AUTH] {e}")
             with open(log_file, "a", encoding="utf-8") as lf:
                 lf.write(f" -> [ERROR AUTH] {e}\n")
+            record_result(sampel_excel, "SESI EXPIRED", "Sesi kedaluwarsa saat mencari sampel/petugas.")
             show_session_expired_banner(module_curl_path="assign/curl.txt", completed_count=sukses, total_count=len(df))
             break
         
@@ -659,6 +672,7 @@ def main():
                 print(msg)
                 with open(log_file, "a", encoding="utf-8") as lf:
                     lf.write(msg + "\n")
+                record_result(sampel_excel, "SESI EXPIRED", "Sesi kedaluwarsa saat assign.", assign_req.status_code)
                 show_session_expired_banner(module_curl_path="assign/curl.txt", completed_count=sukses, total_count=len(df))
                 break
                 
